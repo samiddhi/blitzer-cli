@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blitzer-cli"
+version = "0.1.0"
+description = "A minimalist CLI tool for language text processing"
+authors = [{name = "Blitzer Team"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "click",
+    "tomli; python_version < '3.11'",  # TOML support for older Python versions
+]
+
+[project.scripts]
+blitzer = "blitzer_cli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]

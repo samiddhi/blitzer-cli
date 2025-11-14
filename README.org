@@ -1,0 +1,149 @@
+#+TITLE: Blitzer CLI
+#+SUBTITLE: A minimalist command-line tool for language text processing
+#+AUTHOR: Blitzer Team
+#+OPTIONS: toc:nil num:nil
+
+* Overview
+
+Blitzer CLI is a minimalist command-line tool for language text processing that accepts text via stdin and outputs word lists via stdout. It provides functionality for generating word lists, lemmatized lists, and context-aware lists with example sentences for various languages.
+
+The tool is designed for language learners and researchers who need quick vocabulary extraction from texts to support the "blitzing" technique for accelerated language comprehension.
+
+* Installation
+
+** Using pip (recommended)
+#+BEGIN_SRC sh
+pip install -e .
+#+END_SRC
+
+** Prerequisites
+- Python 3.7+
+- =click= library
+- =tomli= library (for Python < 3.11)
+
+* Usage
+
+** Basic Usage
+The tool reads text from stdin and outputs processed word lists to stdout:
+
+#+BEGIN_SRC sh
+echo "Your text here" | blitzer [language_code] [mode]
+#+END_SRC
+
+** Available Languages
+- =pli= :: Pali (with support for diacritics like ā, ī, ū, ṛ, ḷ, ṅ, ṇ, ñ, ṭ, ḍ, ś, ṣ, ṃ, ṁ)
+- =slv= :: Slovenian (with support for č, š, ž)
+
+** Available Modes
+- =word_list= :: Generates a frequency-sorted list of words
+- =lemma_list= :: Groups conjugated forms under root words
+- =word_list_context= :: Like word_list but includes example sentences
+- =lemma_list_context= :: Like lemma_list but includes example sentences
+
+** Options
+- =--freq= :: Include frequency counts in the output
+- =--prompt= :: Include the processing prompt in output
+- =--src= :: Include the original source text in output
+- =-h=, =--help= :: Show help message
+
+** Examples
+#+BEGIN_SRC sh
+# Basic word list
+echo "This is a test." | blitzer pli word_list
+
+# With frequency counts
+echo "This is a test. This is only a test." | blitzer pli word_list --freq
+
+# With context sentences
+echo "This is a test." | blitzer pli word_list_context --freq
+
+# Using Slovenian
+echo "To je test." | blitzer slv word_list --freq
+
+# Using defaults from config file
+echo "Config test." | blitzer
+#+END_SRC
+
+* Configuration
+
+The tool uses XDG specifications for configuration management:
+
+** Configuration Location
+- Config file: =~/.config/blitzer/config.toml=
+- Exclusion files: =~/.config/blitzer/[lang_code]_exclusion.txt=
+
+** Default Configuration
+When the config file doesn't exist, it will be created with these defaults:
+#+BEGIN_SRC toml
+# Blitzer CLI Configuration
+# This file uses TOML format
+
+# Default settings
+default_language = "pli"  # Default language code
+default_mode = "word_list"  # Default processing mode
+
+# Output settings
+include_frequency = false  # Whether to include frequency by default
+#+END_SRC
+
+When no language or mode is specified, the tool will use the defaults from the configuration file.
+
+** Exclusion Lists
+Exclusion lists prevent known words from appearing in output. Language-specific exclusion lists are automatically created in the config directory when first accessing a language.
+
+* Language Support
+
+** Extending Language Support
+New languages can be added by creating a new processor module in the =languages/= directory:
+
+1. Create a new file =blitzer_cli/languages/[lang_code].py=
+2. Implement a class extending =BaseLanguageProcessor=
+3. Implement the required methods: =tokenize_words()=, =lemmatize()=, and =normalize()=
+
+** Language Dictionaries
+The tool supports language-specific dictionaries that enable lemmatization in =lemma_list= and =lemma_list_context= modes. Language dictionaries are stored in SQLite databases following XDG specifications:
+
+- Database location: =~/.config/blitzer/[lang_code]_lexicon.db=
+
+When a word is processed in lemma mode, the tool queries the database to find the root form of conjugated words. For example, in Pali, both "deva" and "devo" would be mapped to the same root form "deva".
+
+** Current Language Processors
+- =PaliProcessor= :: Handles Pali-specific tokenization, normalization, and lemmatization
+- =SlovenianProcessor= :: Handles Slovenian-specific tokenization, normalization, and lemmatization
+
+* Technical Architecture
+
+** Core Components
+- =cli.py= :: Command-line interface using Click
+- =config.py= :: XDG configuration management
+- =processor.py= :: Core text processing logic
+- =languages/= :: Language-specific processing modules
+
+** Processing Pipeline
+1. Read text from stdin
+2. Load appropriate language processor
+3. Apply text normalization (if language-specific)
+4. Tokenize text into words or lemmatize as needed
+5. Apply exclusion filtering
+6. Format output according to mode
+7. Write results to stdout
+
+** Dependencies
+- =click= :: Command-line interface framework
+- =tomli=/=tomllib= :: TOML configuration parsing
+- Standard Python libraries for text processing
+
+* Development
+
+** Adding New Features
+The architecture is designed for extensibility:
+- Add new language processors in =languages/= directory
+- Extend processing modes in =processor.py=
+- Modify configuration schema in =config.py=
+
+** Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make changes
+4. Test functionality
+5. Submit a pull request

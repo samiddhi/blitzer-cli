@@ -1,0 +1,2 @@
+[console_scripts]
+blitzer = blitzer_cli.cli:main
