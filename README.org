@@ -33,6 +33,7 @@ echo "Your text here" | blitzer [language_code] [mode]
 ** Available Languages
 - =pli= :: Pali (with support for diacritics like ā, ī, ū, ṛ, ḷ, ṅ, ṇ, ñ, ṭ, ḍ, ś, ṣ, ṃ, ṁ)
 - =slv= :: Slovenian (with support for č, š, ž)
+- =generic= :: Default fallback processor for any other language (no lemmatization support)
 
 ** Available Modes
 - =word_list= :: Generates a frequency-sorted list of words
@@ -70,7 +71,7 @@ The tool uses XDG specifications for configuration management:
 
 ** Configuration Location
 - Config file: =~/.config/blitzer/config.toml=
-- Exclusion files: =~/.config/blitzer/[lang_code]_exclusion.txt=
+- Exclusion files: =~/.config/blitzer/[lang_code]_exclusion.txt= (only location looked up)
 
 ** Default Configuration
 When the config file doesn't exist, it will be created with these defaults:
@@ -81,12 +82,10 @@ When the config file doesn't exist, it will be created with these defaults:
 # Default settings
 default_language = "pli"  # Default language code
 default_mode = "word_list"  # Default processing mode
-
-# Output settings
-include_frequency = false  # Whether to include frequency by default
 #+END_SRC
 
 When no language or mode is specified, the tool will use the defaults from the configuration file.
+Note that frequency output is controlled by the --freq command-line option, not by any configuration setting.
 
 ** Exclusion Lists
 Exclusion lists prevent known words from appearing in output. Language-specific exclusion lists are automatically created in the config directory when first accessing a language.
@@ -94,22 +93,24 @@ Exclusion lists prevent known words from appearing in output. Language-specific 
 * Language Support
 
 ** Extending Language Support
-New languages can be added by creating a new processor module in the =languages/= directory:
+The tool already supports any language through the GenericProcessor fallback. However, if you want lemmatization support for a new language, you'll need to contribute with the necessary database and processor code:
 
 1. Create a new file =blitzer_cli/languages/[lang_code].py=
 2. Implement a class extending =BaseLanguageProcessor=
 3. Implement the required methods: =tokenize_words()=, =lemmatize()=, and =normalize()=
+4. Provide a SQLite database with lemmatization data at =~/.config/blitzer/[lang_code]_lexicon.db=
 
 ** Language Dictionaries
-The tool supports language-specific dictionaries that enable lemmatization in =lemma_list= and =lemma_list_context= modes. Language dictionaries are stored in SQLite databases following XDG specifications:
+The tool supports language-specific dictionaries that enable lemmatization in =lemma_list= and =lemma_list_context= modes. Lemmatization is the process of grouping together the different inflected forms of a word so they can be analyzed as a single item. For example, in Pali, both "deva" and "devo" would be mapped to the same root form "deva". Language dictionaries are stored in SQLite databases following XDG specifications:
 
 - Database location: =~/.config/blitzer/[lang_code]_lexicon.db=
 
-When a word is processed in lemma mode, the tool queries the database to find the root form of conjugated words. For example, in Pali, both "deva" and "devo" would be mapped to the same root form "deva".
+The tool looks for these databases but does not create them automatically. When a language dictionary is not available, the tool falls back to basic word processing without lemmatization capabilities.
 
 ** Current Language Processors
 - =PaliProcessor= :: Handles Pali-specific tokenization, normalization, and lemmatization
 - =SlovenianProcessor= :: Handles Slovenian-specific tokenization, normalization, and lemmatization
+- =GenericProcessor= :: Default fallback that handles basic tokenization without lemmatization for any other language
 
 * Technical Architecture
 
@@ -130,8 +131,7 @@ When a word is processed in lemma mode, the tool queries the database to find th
 
 ** Dependencies
 - =click= :: Command-line interface framework
-- =tomli=/=tomllib= :: TOML configuration parsing
-- Standard Python libraries for text processing
+- =tomli= (or =tomllib= for Python 3.11+) :: TOML configuration parsing
 
 * Development
 

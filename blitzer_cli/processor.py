@@ -36,13 +36,6 @@ def get_language_processor(language_code: str):
     if exclusion_path.exists():
         with open(exclusion_path, 'r', encoding="utf-8") as f:
             exclusion_terms = [line.strip() for line in f if line.strip()]
-    else:
-        # If exclusion file doesn't exist in config, try default location in package
-        package_dir = Path(__file__).parent
-        default_exclusion_path = package_dir / 'languages' / language_code / 'exclusion.txt'
-        if default_exclusion_path.exists():
-            with open(default_exclusion_path, 'r', encoding="utf-8") as f:
-                exclusion_terms = [line.strip() for line in f if line.strip()]
     
     # Try to import the specific language processor
     if language_code == 'pli':
