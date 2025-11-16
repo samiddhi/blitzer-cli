@@ -14,12 +14,13 @@ from blitzer_cli.config import load_config
     epilog='Reads text from stdin, outputs to stdout. Example: `echo "text" | blitzer pli word_list`',
     context_settings={"help_option_names": ['-h', '--help']}
 )
+@click.argument('text', required=False)
 @click.argument('language_code', required=False)
 @click.argument('mode', required=False)
 @click.option('--freq', 'freq_flag', is_flag=True, help='Include frequency counts')
 @click.option('--prompt', 'prompt_flag', is_flag=True, help='Include prompt in output')
 @click.option('--src', 'src_flag', is_flag=True, help='Include source text in output')
-def main(language_code, mode, freq_flag, prompt_flag, src_flag):
+def main(text, language_code, mode, freq_flag, prompt_flag, src_flag):
     """Blitzer CLI - Process text and generate word lists."""
     # Load configuration
     config = load_config()
@@ -30,12 +31,15 @@ def main(language_code, mode, freq_flag, prompt_flag, src_flag):
     if mode is None:
         mode = config.get('default_mode', 'word_list')
     
-    # Read text from stdin
-    if not sys.stdin.isatty():
-        input_text = sys.stdin.read()
+
+    if text is not None:
+        input_text = text.strip()
     else:
-        print("Error: No input provided. Please pipe text to the command.", file=sys.stderr)
-        sys.exit(1)
+        input_text = sys.stdin.read().strip()
+
+    if not input_text:
+        click.echo("No input text provided.", err=True)
+        raise click.Abort()
     
     # Process the text
     try:
