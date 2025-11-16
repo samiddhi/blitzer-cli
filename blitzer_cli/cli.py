@@ -26,8 +26,7 @@ def cli():
     pass
 
 
-@cli.command("blitz", help="Return wordlist from text.", epilog='Reads text from stdin, outputs to stdout. Example: `echo "text" | blitzer pli word_list`',
-    context_settings={"help_option_names": ["-h", "--help"]})
+@cli.command("blitz", help="Return wordlist from text.")
 @click.option("--text", "-t", help="Direct text input (overrides stdin).")
 @click.argument("language_code", required=False)
 @click.argument("mode", required=False)
@@ -39,7 +38,7 @@ def blitz(text, language_code, mode, freq, prompt, src):
 
     # Use config defaults if not provided via command line
     if language_code is None:
-        language_code = config.get("default_language", "pli")
+        language_code = config.get("default_language", "base")
     if mode is None:
         mode = config.get("default_mode", "word_list")
 
@@ -66,6 +65,11 @@ def blitz(text, language_code, mode, freq, prompt, src):
     except Exception as e:
         print(f"Error processing text: {e}", file=sys.stderr)
         sys.exit(1)
+
+@cli.command("list", help="Lists supported languages for lemmatization.")
+def list_languages():
+    for lang in get_supported_languages():
+        click.echo(lang)
 
 
 if __name__ == "__main__":
