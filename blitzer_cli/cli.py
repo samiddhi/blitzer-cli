@@ -6,59 +6,67 @@ Accepts text via stdin and outputs word lists via stdout.
 
 import sys
 import click
+import pkgutil
 from blitzer_cli.processor import process_text
 from blitzer_cli.config import load_config
+from blitzer_cli.languages import __path__ as languages_path
 
 
-@click.command(
-    epilog='Reads text from stdin, outputs to stdout. Example: `echo "text" | blitzer pli word_list`',
-    context_settings={"help_option_names": ['-h', '--help']}
-)
-@click.argument('text', required=False)
-@click.argument('language_code', required=False)
-@click.argument('mode', required=False)
-@click.option('--freq', 'freq_flag', is_flag=True, help='Include frequency counts')
-@click.option('--prompt', 'prompt_flag', is_flag=True, help='Include prompt in output')
-@click.option('--src', 'src_flag', is_flag=True, help='Include source text in output')
-def main(text, language_code, mode, freq_flag, prompt_flag, src_flag):
-    """Blitzer CLI - Process text and generate word lists."""
-    # Load configuration
+def get_supported_languages():
+    supported = []
+    for _, module_name, _ in pkgutil.iter_modules(languages_path):
+        if module_name != "__init__":
+            supported.append(module_name)
+    return supported
+
+
+@click.group(invoke_without_command=False)
+def cli():
+    """Blitzer CLI: Vocabulary extraction for language learners."""
+    pass
+
+
+@cli.command("blitz", help="Return wordlist from text.", epilog='Reads text from stdin, outputs to stdout. Example: `echo "text" | blitzer pli word_list`',
+    context_settings={"help_option_names": ["-h", "--help"]})
+@click.option("--text", "-t", help="Direct text input (overrides stdin).")
+@click.argument("language_code", required=False)
+@click.argument("mode", required=False)
+@click.option("--freq", "-f", is_flag=True, help="Includes word frequency count in output.")
+@click.option("--prompt", "-p", is_flag=True, help="Includes custom prompt for LLM at the top of output.")
+@click.option("--src", "-s", help="Includes the full source text at the top of output.")
+def blitz(text, language_code, mode, freq, prompt, src):
     config = load_config()
-    
+
     # Use config defaults if not provided via command line
     if language_code is None:
-        language_code = config.get('default_language', 'pli')
+        language_code = config.get("default_language", "pli")
     if mode is None:
-        mode = config.get('default_mode', 'word_list')
-    
+        mode = config.get("default_mode", "word_list")
 
-    if text is not None:
-        input_text = text.strip()
-    else:
-        input_text = sys.stdin.read().strip()
+    input_text = text.strip() if text else sys.stdin.read().strip()
 
     if not input_text:
         click.echo("No input text provided.", err=True)
         raise click.Abort()
-    
+
     # Process the text
     try:
         output = process_text(
-            input_text, 
-            language_code, 
-            mode, 
-            freq_flag=freq_flag,
-            prompt_flag=prompt_flag,
-            src_flag=src_flag
+            input_text,
+            language_code,
+            mode,
+            freq_flag=freq,
+            prompt_flag=prompt,
+            src_flag=src,
         )
-        
+
         # Output to stdout
-        print(output, end='')
-        
+        print(output, end="")
+
     except Exception as e:
         print(f"Error processing text: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    cli()
