@@ -1,0 +1,56 @@
+* Changelog
+
+All notable changes to the Blitzer CLI project will be documented in this file.
+
+** Unreleased
+
+** [0.0.2] - 2025-11-16
+
+*** Changed
+
+- *Refactored from mode-based to flag-based CLI interface*
+  - Replaced positional arguments for processing modes with boolean flags
+  - Changed command structure from =blitzer [text] [language] [mode]= to =blitzer blitz -t [text] -l [language] [flags]=
+  - Introduced subcommands: =blitz= for processing and =list= for showing supported languages
+
+- *Made language support more dynamic and extensible*
+  - Added requirement for each language module to implement a =get_processor()= factory function
+  - Implemented dynamic loading of language processors using =importlib=
+  - Removed need to modify core files when adding new languages
+  - Made language registration fully automatic through directory scanning
+
+*** Added
+
+- Boolean flags for processing options:
+  - =-L= / =--lemmatize=: Treats different declensions/forms of the same word as one word
+  - =-f= / =--freq=: Include frequency counts in the output
+  - =-c= / =--context=: Include sample context for each word in output
+  - =-p= / =--prompt=: Include custom prompt for LLM at the top of output
+  - =-s= / =--src=: Include the full source text at the top of output
+
+- New =list= subcommand to show supported languages
+
+- Added =generic= language processor for basic space-separated language processing
+
+- Fixed syntax error in Pali language processor's normalize method
+
+*** Changed
+
+- Made language flag required (was previously optional with defaults)
+- Updated language listing to exclude abstract base class
+- Updated CLI help text to reflect new required language flag
+
+*** Fixed
+
+- Fixed bug where Pali processor had a floating =.replace()= call not attached to an object
+- Fixed config loading code to use correct TOML import in config.py
+- Corrected the processor loading mechanism to work with the new dynamic system
+
+** [0.0.1] - Initial Release
+
+*** Added
+
+- Basic CLI tool with mode-based processing
+- Support for Pali and Slovenian languages
+- Configuration management using XDG specifications
+- Basic text processing with tokenization and lemmatization

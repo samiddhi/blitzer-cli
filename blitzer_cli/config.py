@@ -31,14 +31,10 @@ def load_config():
     # Create config directory if it doesn't exist
     config_dir.mkdir(parents=True, exist_ok=True)
     
-    # Create a default config file if it doesn't exist
-    if not config_file.exists():
-        create_default_config(config_file)
-    
     # Load the config
     try:
         with open(config_file, 'rb') as f:
-            return tomli.load(f)
+            return tomllib.load(f)
     except Exception:
         # Return empty config if loading fails
         return {}
@@ -50,7 +46,7 @@ def create_default_config(config_file):
 # This file uses TOML format
 
 # Default settings
-default_language = "pli"  # Default language code
+default_language = "generic"  # Default language code
 default_mode = "word_list"  # Default processing mode
 
 # Output settings

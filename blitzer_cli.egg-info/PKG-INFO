@@ -8,39 +8,3 @@ Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 Requires-Dist: click
 Requires-Dist: tomli; python_version < "3.11"
-
-# Blitzer CLI
-
-A minimalist command-line tool for language text processing. Accepts text via stdin and outputs word lists via stdout.
-
-## Installation
-
-```bash
-pip install -e .
-```
-
-## Usage
-
-```bash
-# Basic usage
-echo "Your text here" | blitzer [language_code] [mode]
-
-# With frequency counts
-echo "Your text here" | blitzer pli word_list --freq
-
-# Available languages: pli (Pali), slv (Slovenian)
-# Available modes: word_list, lemma_list, word_list_context, lemma_list_context
-```
-
-## Configuration
-
-The tool uses XDG specifications for configuration:
-- Config file: `~/.config/blitzer/config.toml`
-- Exclusion files: `~/.config/blitzer/[lang_code]_exclusion.txt`
-
-## Features
-
-- Minimalist design with clean output
-- Language extensibility through plugin system
-- Configurable defaults via XDG
-- Same processing functionality as original Blitzer

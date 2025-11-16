@@ -109,3 +109,8 @@ class PaliProcessor(BaseLanguageProcessor):
         DPD database handles all compounds without (') chars
         """
         return text.replace("ṁ", "ṃ").replace("'", "").replace("”", "").replace("’", "")
+
+
+def get_processor(language_code: str, exclusion_list: List[str], lexicon_db_path: Optional[str] = None):
+    """Factory function to create and return a PaliProcessor instance."""
+    return PaliProcessor(language_code, exclusion_list, lexicon_db_path)

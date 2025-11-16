@@ -15,7 +15,7 @@ from blitzer_cli.languages import __path__ as languages_path
 def get_supported_languages():
     supported = []
     for _, module_name, _ in pkgutil.iter_modules(languages_path):
-        if module_name != "__init__":
+        if module_name not in ["__init__", "base"]:  # Exclude abstract base class
             supported.append(module_name)
     return supported
 
@@ -28,19 +28,17 @@ def cli():
 
 @cli.command("blitz", help="Return wordlist from text.")
 @click.option("--text", "-t", help="Direct text input (overrides stdin).")
-@click.argument("language_code", required=False)
-@click.argument("mode", required=False)
+@click.option("--language_code", "-l", required=True, help="ISO 639 three-character language code or \"generic\" for simple processing.\"")
+@click.option("--lemmatize", "-L", is_flag=True, help="Treats different declensions/forms of the same word as one word.")
 @click.option("--freq", "-f", is_flag=True, help="Includes word frequency count in output.")
-@click.option("--prompt", "-p", is_flag=True, help="Includes custom prompt for LLM at the top of output.")
-@click.option("--src", "-s", help="Includes the full source text at the top of output.")
-def blitz(text, language_code, mode, freq, prompt, src):
-    config = load_config()
-
-    # Use config defaults if not provided via command line
+@click.option("--context", "-c", is_flag=True, help="Includes sample context for each word in output.")
+@click.option("--prompt", "-p", is_flag=True, help="Includes custom prompt for LLM at the top of output.",)
+@click.option("--src", "-s", is_flag=True, help="Includes the full source text at the top of output.")
+def blitz(text, language_code, lemmatize, freq, context, prompt, src):
+    # Language code must be provided
     if language_code is None:
-        language_code = config.get("default_language", "base")
-    if mode is None:
-        mode = config.get("default_mode", "word_list")
+        click.echo("Language code is required. Use -l or --language_code to specify a language.", err=True)
+        raise click.Abort()
 
     input_text = text.strip() if text else sys.stdin.read().strip()
 
@@ -53,8 +51,9 @@ def blitz(text, language_code, mode, freq, prompt, src):
         output = process_text(
             input_text,
             language_code,
-            mode,
+            lemmatize_flag=lemmatize,
             freq_flag=freq,
+            context_flag=context,
             prompt_flag=prompt,
             src_flag=src,
         )

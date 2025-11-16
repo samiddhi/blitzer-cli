@@ -26,49 +26,54 @@ pip install -e .
 * Usage
 
 ** Basic Usage
-The tool reads text from stdin or as its first argument and outputs processed word lists to stdout:
+The tool reads text from stdin and outputs processed word lists to stdout using a subcommand architecture with flags:
 
 #+BEGIN_SRC sh
-#With stdin
-echo "Your text here" | blitzer [language_code] [mode]
+# With stdin
+echo "Your text here" | blitzer blitz -l [language_code] [flags]
 
-# Input as argument
-blitzer "Your text here" [language_code] [mode]
+# With direct text input
+blitzer blitz -t "Your text here" -l [language_code] [flags]
 #+END_SRC
 
 ** Available Languages
-- =generic= :: Default fallback processor for any other language (no lemmatization support)
+- =generic= :: Generic processor for space-separated languages (no lemmatization support)
 - =pli= :: Pali (with support for diacritics like ā, ī, ū, ṛ, ḷ, ṅ, ṇ, ñ, ṭ, ḍ, ś, ṣ, ṃ, ṁ)
 - =slv= :: Slovenian (with support for č, š, ž)
 
-** Available Modes
-- =word_list= :: Generates a frequency-sorted list of words
-- =lemma_list= :: Groups conjugated forms under root words
-- =word_list_context= :: Like word_list but includes example sentences
-- =lemma_list_context= :: Like lemma_list but includes example sentences
+** Available Commands
+- =blitz= :: Main command for processing text with configurable flags
+- =list= :: Lists supported languages for lemmatization
 
-** Options
-- =--freq= :: Include frequency counts in the output
-- =--prompt= :: Include the processing prompt in output
-- =--src= :: Include the original source text in output
+** Flags
+- =-L=, =--lemmatize= :: Treats different declensions/forms of the same word as one word
+- =-f=, =--freq= :: Include frequency counts in the output
+- =-c=, =--context= :: Include sample context for each word in output
+- =-p=, =--prompt= :: Include custom prompt for LLM at the top of output
+- =-s=, =--src= :: Include the full source text at the top of output
+- =-l=, =--language_code= :: ISO 639 three-character language code
+- =-t=, =--text= :: Direct text input (overrides stdin)
 - =-h=, =--help= :: Show help message
 
 ** Examples
 #+BEGIN_SRC sh
 # Basic word list
-blitzer "This is a test." pli word_list
+echo "This is a test." | blitzer blitz -l pli
 
 # With frequency counts
-blitzer "This is a test. This is only a test." pli word_list --freq
+echo "This is a test. This is only a test." | blitzer blitz -l pli -f
 
 # With context sentences
-blitzer "This is a test." pli word_list_context --freq
+echo "This is a test." | blitzer blitz -l pli -f -c
 
-# Using Slovenian
-blitzer "To je test." slv word_list --freq
+# Lemmatized output
+echo "To je test." | blitzer blitz -l slv -L
 
-# Using defaults from config file
-blitzer "Config test."
+# Using multiple flags
+echo "This is a test." | blitzer blitz -l pli -L -f -c -p
+
+# List available languages
+blitzer list
 #+END_SRC
 
 * Configuration
@@ -86,12 +91,13 @@ When the config file doesn't exist, it will be created with these defaults:
 # This file uses TOML format
 
 # Default settings
-default_language = "pli"  # Default language code
-default_mode = "word_list"  # Default processing mode
+default_language = "pli"  # Default language for config purposes only
+
+# Output settings
+include_frequency = false  # Whether to include frequency by default
 #+END_SRC
 
-When no language or mode is specified, the tool will use the defaults from the configuration file.
-Note that frequency output is controlled by the --freq command-line option, not by any configuration setting.
+Note: The language flag is now required, so the default_language in the config is only for configuration reference.
 
 ** Exclusion Lists
 Exclusion lists prevent known words from appearing in output. Language-specific exclusion lists are automatically created in the config directory when first accessing a language.
@@ -99,15 +105,18 @@ Exclusion lists prevent known words from appearing in output. Language-specific 
 * Language Support
 
 ** Extending Language Support
-The tool already supports any language through the GenericProcessor fallback. However, if you want lemmatization support for a new language, you'll need to contribute with the necessary database and processor code:
+The architecture was refactored to make adding new languages much more dynamic and extensible. To add support for a new language:
 
 1. Create a new file =blitzer_cli/languages/[lang_code].py=
 2. Implement a class extending =BaseLanguageProcessor=
 3. Implement the required methods: =tokenize_words()=, =lemmatize()=, and =normalize()=
-4. Provide a SQLite database with lemmatization data at =~/.config/blitzer/[lang_code]_lexicon.db=
+4. Provide a =get_processor()= factory function that creates and returns an instance of your processor
+5. Provide a SQLite database with lemmatization data at =~/.config/blitzer/[lang_code]_lexicon.db=
+
+This design removes the need to modify core files when adding new languages, making the system much more extensible.
 
 ** Language Dictionaries
-The tool supports language-specific dictionaries that enable lemmatization in =lemma_list= and =lemma_list_context= modes. Lemmatization is the process of grouping together the different inflected forms of a word so they can be analyzed as a single item. For example, in Pali, both "deva" and "devo" would be mapped to the same root form "deva". Language dictionaries are stored in SQLite databases following XDG specifications:
+The tool supports language-specific dictionaries that enable lemmatization when using the =-L= flag. Lemmatization is the process of grouping together the different inflected forms of a word so they can be analyzed as a single item. For example, in Pali, both "deva" and "devo" would be mapped to the same root form "deva". Language dictionaries are stored in SQLite databases following XDG specifications:
 
 - Database location: =~/.config/blitzer/[lang_code]_lexicon.db=
 
@@ -116,7 +125,7 @@ The tool looks for these databases but does not create them automatically. When 
 ** Current Language Processors
 - =PaliProcessor= :: Handles Pali-specific tokenization, normalization, and lemmatization
 - =SlovenianProcessor= :: Handles Slovenian-specific tokenization, normalization, and lemmatization
-- =GenericProcessor= :: Default fallback that handles basic tokenization without lemmatization for any other language
+- =BaseLanguageProcessor= :: Base class that handles basic tokenization without lemmatization for any other language
 
 * Technical Architecture
 
@@ -128,11 +137,11 @@ The tool looks for these databases but does not create them automatically. When 
 
 ** Processing Pipeline
 1. Read text from stdin or from text argument
-2. Load appropriate language processor
+2. Load appropriate language processor via dynamic import and get_processor function
 3. Apply text normalization (if language-specific)
 4. Tokenize text into words or lemmatize as needed
 5. Apply exclusion filtering
-6. Format output according to mode
+6. Format output according to flags
 7. Write results to stdout
 
 ** Dependencies
@@ -143,6 +152,10 @@ The tool looks for these databases but does not create them automatically. When 
 
 ** Adding New Features
 The architecture is designed for extensibility:
-- Add new language processors in =languages/= directory
-- Extend processing modes in =processor.py=
+- Add new language processors in =languages/= directory with get_processor function
+- Extend processing capabilities in =processor.py=
 - Modify configuration schema in =config.py=
+
+* Changelog
+
+For the complete list of changes, see the =CHANGELOG.org= file.

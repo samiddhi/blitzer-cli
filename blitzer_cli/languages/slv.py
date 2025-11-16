@@ -83,3 +83,8 @@ class SlovenianProcessor(BaseLanguageProcessor):
     def normalize(self, text: str) -> str:
         """Normalize Slovenian text (default implementation)."""
         return text
+
+
+def get_processor(language_code: str, exclusion_list: List[str], lexicon_db_path: Optional[str] = None):
+    """Factory function to create and return a SlovenianProcessor instance."""
+    return SlovenianProcessor(language_code, exclusion_list, lexicon_db_path)
