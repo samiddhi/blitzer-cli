@@ -136,36 +136,49 @@ def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
     
     cursor = conn.cursor()
     
-    # Process each unique token only once to minimize database queries
-    seen_tokens = set()
-    token_cache = {}  # Cache for query results
+    # Create mapping to preserve original tokens and their order
+    token_to_lower = {token: token.lower() for token in tokens}
+    unique_tokens = list(set(token_to_lower.values()))
     
+    # Create a temporary table approach for batch lookup
+    # First, create a temporary table with all the tokens we need to look up
+    cursor.execute("CREATE TEMP TABLE temp_lookup (form TEXT)")
+    
+    # Insert all unique tokens into the temp table
+    cursor.executemany("INSERT INTO temp_lookup (form) VALUES (?)", [(token,) for token in unique_tokens])
+    
+    # Perform a single JOIN query to get all lemmas at once
+    cursor.execute("""
+        SELECT tl.form, l.lemma 
+        FROM temp_lookup tl
+        JOIN Forms f ON f.form_representation = tl.form COLLATE NOCASE
+        JOIN Lemmas l ON l.id = f.lemma_id
+    """)
+    
+    # Group the results by form
+    form_to_lemmas = {}
+    for form, lemma in cursor.fetchall():
+        if form not in form_to_lemmas:
+            form_to_lemmas[form] = []
+        form_to_lemmas[form].append(lemma)
+    
+    # Drop the temporary table
+    cursor.execute("DROP TABLE temp_lookup")
+    
+    # For tokens not found in the database, we need to identify them
+    # All unique tokens that have no lemmas are not found in DB
+    not_found_tokens = set(unique_tokens) - set(form_to_lemmas.keys())
+    
+    # Build the result list in the original order
     processed_tokens = []
-    
     for token in tokens:
-        lower_token = token.lower()
-        
-        # Check if we've already processed this token (case-insensitively)
-        if lower_token not in token_cache:
-            # Query for lemma using case-insensitive match
-            cursor.execute(
-                "SELECT l.lemma FROM Lemmas l JOIN Forms f ON l.id = f.lemma_id WHERE f.form_representation = ? COLLATE NOCASE", 
-                (lower_token,)
-            )
-            results = cursor.fetchall()
-            
-            if not results:
-                # If no rows found, keep surface token
-                token_cache[lower_token] = [token]
-            elif len(results) == 1:
-                # If one row, use that lemma
-                token_cache[lower_token] = [results[0][0]]
-            else:
-                # If multiple rows, return each possible lemma
-                token_cache[lower_token] = [row[0] for row in results]
-        
-        # Add the cached result(s) to the output
-        processed_tokens.extend(token_cache[lower_token])
+        lower_token = token_to_lower[token]
+        if lower_token in form_to_lemmas:
+            # Token was found in DB, add all its lemmas
+            processed_tokens.extend(form_to_lemmas[lower_token])
+        else:
+            # Token was not found in DB, add the original token
+            processed_tokens.append(token)
     
     return processed_tokens
 
