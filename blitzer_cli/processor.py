@@ -1,12 +1,23 @@
-"""Core text processing functionality."""
+"""New core text processing functionality following the specified architecture."""
 
 import re
+import sqlite3
+import sys
 from collections import Counter, defaultdict
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pathlib import Path
-import importlib
-from .config import get_config_dir
-from .data_manager import get_language_data_path, ensure_language_data
+
+
+# In-memory cache for database connections (per language)
+_db_cache = {}
+
+
+def regex_tokenize(text: str) -> list[str]:
+    """Core fallback tokenizer using the regex library."""
+    import regex
+    # Pattern that works for 95% of languages: letters with optional diacritics/numbers/apostrophes/hyphens
+    tokens = regex.findall(r"\p{L}+(?:[\p{M}\p{N}'\-]+\p{L}+)*", text.lower())
+    return tokens
 
 
 def process_text(
@@ -18,101 +29,228 @@ def process_text(
     prompt_flag: bool = False,
     src_flag: bool = False,
 ) -> str:
-    """Process text according to specified flags."""
-    processor = get_language_processor(language_code)
-    normalized_text = processor.normalize(text)
-    return _process_core(
-        normalized_text,
-        processor,
-        lemmatize_flag,
-        freq_flag,
-        context_flag,
-        prompt_flag,
+    """Process text according to specified flags following the new architecture."""
+    # Load language specification via entry points
+    language_spec = get_language_spec(language_code)
+    
+    # Handle prompt flag - if flag is used but language doesn't have a configured prompt, warn and ignore
+    if prompt_flag:
+        prompt_text = get_language_prompt(language_code)
+        if not prompt_text:
+            print("WARNING: No language-specific prompt configured for this language. Ignoring --prompt flag.", file=sys.stderr)
+            prompt_flag = False
+    
+    # 1. Normalization
+    if language_spec.get("normalizer"):
+        normalized_text = language_spec["normalizer"](text)
+    else:
+        normalized_text = text.lower()
+    
+    # 2. Tokenization  
+    if language_spec.get("tokenizer"):
+        tokens = language_spec["tokenizer"](normalized_text)
+    else:
+        tokens = regex_tokenize(normalized_text)
+    
+    # 3. Lemmatization (only if --lemmatize/-L and valid database provided)
+    processed_tokens = []
+    if lemmatize_flag and language_code in ['base', 'generic']:
+        # If using base/generic language with lemmatize flag, issue warning and continue with original tokens
+        print(f"WARNING: Base/generic mode has no lemmatization. Proceeding without lemmatization.", file=sys.stderr)
+        processed_tokens = tokens
+    elif lemmatize_flag and language_spec.get("custom_lemmatizer"):
+        # Use custom lemmatizer if provided
+        processed_tokens = language_spec["custom_lemmatizer"](tokens)
+    elif lemmatize_flag and language_spec.get("db_path"):
+        # Use generic SQL lemmatizer
+        processed_tokens = sql_lemmatize_tokens(tokens, language_spec["db_path"])
+    elif lemmatize_flag:
+        # If lemmatize flag is set but no lemmatizer available, issue warning and continue with original tokens
+        print(f"WARNING: No lemmatizer available for language {language_code}. Proceeding without lemmatization.", file=sys.stderr)
+        processed_tokens = tokens
+    else:
+        # No lemmatization, keep original tokens
+        processed_tokens = tokens
+    
+    # 4. Post-processing with exclusion list and formatting
+    excluded_terms = get_exclusion_terms(language_code)
+    return _format_output(
+        processed_tokens, 
+        normalized_text, 
+        excluded_terms,
+        freq_flag, 
+        context_flag, 
+        prompt_flag, 
         src_flag,
+        language_code
     )
 
 
-def _process_core(
-    text: str,
-    processor,
-    lemmatize_flag: bool,
-    freq_flag: bool,
-    context_flag: bool,
-    prompt_flag: bool,
-    src_flag: bool,
-) -> str:
-    """Unified core: tokenize, lemmatize/count/exclude, optional contexts."""
-    excluded_terms = set(processor.exclusion_list)
-    counts = Counter()
-    occurrences = defaultdict(list)
-    seen_sentences = defaultdict(set)
-
-    if context_flag:
-        sentences = split_sentences(text)
-        for sentence in sentences:
-            words_in_sentence = processor.tokenize_words(sentence)
-            for original_word in words_in_sentence:
-                if (
-                    original_word.lower() in excluded_terms
-                ):  # Case-insensitive exclude on form
-                    continue
-                lemmas = (
-                    processor.lemmatize(original_word)
-                    if lemmatize_flag
-                    else [original_word]
-                )
-                if not lemmas:
-                    lemmas = [original_word]
-                for lemma in lemmas:
-                    key = lemma.lower()
-                    counts[key] += 1
-                    if (
-                        len(occurrences[key]) < 2
-                        and sentence not in seen_sentences[key]
-                    ):
-                        seen_sentences[key].add(sentence)
-                        escaped = re.escape(original_word)
-                        bolded = re.sub(
-                            r"\b(" + escaped + r")\b",
-                            r"<b>\1</b>",
-                            sentence,
-                            flags=re.IGNORECASE,
-                        )
-                        occurrences[key].append(bolded)
+def get_language_spec(language_code: str) -> Dict[str, Any]:
+    """Load language specification via entry points. Special handling for 'base' language."""
+    # Special handling for 'base'/'generic' - return basic config without requiring a plugin
+    if language_code in ['base', 'generic']:
+        return {
+            "db_path": None,
+            "normalizer": None,
+            "tokenizer": None,
+            "custom_lemmatizer": None
+        }
+    
+    try:
+        from importlib.metadata import entry_points
+    except ImportError:
+        import importlib_metadata as metadata
+        entry_points = metadata.entry_points
+    
+    # Check which version of entry_points API is available
+    eps_obj = entry_points()
+    if hasattr(eps_obj, 'select'):
+        # Python 3.10+ syntax: entry_points() returns a selection object
+        language_eps = eps_obj.select(group='blitzer.languages')
     else:
-        words = processor.tokenize_words(text)
-        for original_word in words:
-            if original_word.lower() in excluded_terms:
-                continue
-            if lemmatize_flag:
-                lemmas = processor.lemmatize(original_word)
-                if not lemmas:
-                    counts[original_word.lower()] += 1
-                else:
-                    for lemma in lemmas:
-                        counts[lemma.lower()] += 1
-            else:
-                counts[original_word.lower()] += 1
+        # Python 3.8-3.9 syntax: entry_points() returns a dict-like object
+        language_eps = eps_obj.get('blitzer.languages', [])
+    
+    for ep in language_eps:
+        if ep.name == language_code:
+            register_func = ep.load()
+            return register_func()
+    
+    raise ValueError(f"Unsupported language: {language_code}")
 
-    output_lines = []
-    for key, count in sorted(counts.items(), key=lambda item: item[1], reverse=True):
-        if key in excluded_terms:
-            continue
+
+def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
+    """Lemmatize tokens using SQLite database lookup with in-memory caching."""
+    global _db_cache
+    
+    if not tokens:
+        return []
+    
+    # Get or create database connection in cache
+    if db_path not in _db_cache:
+        conn = sqlite3.connect(db_path)
+        _db_cache[db_path] = conn
+    else:
+        conn = _db_cache[db_path]
+    
+    cursor = conn.cursor()
+    
+    # Process each unique token only once to minimize database queries
+    seen_tokens = set()
+    token_cache = {}  # Cache for query results
+    
+    processed_tokens = []
+    
+    for token in tokens:
+        lower_token = token.lower()
+        
+        # Check if we've already processed this token (case-insensitively)
+        if lower_token not in token_cache:
+            # Query for lemma using case-insensitive match
+            cursor.execute(
+                "SELECT l.lemma FROM Lemmas l JOIN Forms f ON l.id = f.lemma_id WHERE f.form_representation = ? COLLATE NOCASE", 
+                (lower_token,)
+            )
+            results = cursor.fetchall()
+            
+            if not results:
+                # If no rows found, keep surface token
+                token_cache[lower_token] = [token]
+            elif len(results) == 1:
+                # If one row, use that lemma
+                token_cache[lower_token] = [results[0][0]]
+            else:
+                # If multiple rows, return each possible lemma
+                token_cache[lower_token] = [row[0] for row in results]
+        
+        # Add the cached result(s) to the output
+        processed_tokens.extend(token_cache[lower_token])
+    
+    return processed_tokens
+
+
+def get_exclusion_terms(language_code: str) -> set:
+    """Get exclusion terms for the language."""
+    from .config import get_config_dir
+    config_dir = get_config_dir()
+    exclusion_path = config_dir / f"{language_code}_exclusion.txt"
+    exclusion_terms = set()
+    if exclusion_path.exists():
+        with open(exclusion_path, "r", encoding="utf-8") as f:
+            exclusion_terms = {line.strip().lower() for line in f if line.strip()}
+    return exclusion_terms
+
+
+def get_language_prompt(language_code: str) -> Optional[str]:
+    """Get language-specific prompt from configuration."""
+    from .config import load_config
+    config = load_config()
+    prompts = config.get('prompts', {})
+    return prompts.get(language_code)
+
+
+def _format_output(
+    tokens: List[str], 
+    normalized_text: str, 
+    excluded_terms: set,
+    freq_flag: bool, 
+    context_flag: bool, 
+    prompt_flag: bool, 
+    src_flag: bool,
+    language_code: str
+) -> str:
+    """Format output based on flags."""
+    import sys
+    
+    result_lines = []
+    
+    if src_flag:
+        result_lines.extend(["SOURCE TEXT:", "", normalized_text, "", "------"])
+    
+    if prompt_flag:
+        prompt_text = get_language_prompt(language_code)
+        if prompt_text:
+            result_lines.extend(["PROMPT:", "", prompt_text, "", "------", "******", "------", ""])
+    
+    # Calculate frequencies if needed
+    if freq_flag:
+        token_counts = Counter(token for token in tokens if token.lower() not in excluded_terms)
+        for token, count in sorted(token_counts.items(), key=lambda x: x[1], reverse=True):
+            result_lines.append(f"{token}; {count}")
+    else:
         if context_flag:
-            contexts = occurrences[key]
-            formatted = ['"' + s.replace("\n", "\\n") + '"' for s in contexts]
-            joiner = ", ".join(formatted)
-            if freq_flag:
-                output_lines.append(f"{key}; {count}; [{joiner}]")
-            else:
-                output_lines.append(f"{key}; [{joiner}]")
+            # For context, we need to map tokens back to sentences
+            sentences = split_sentences(normalized_text)
+            token_counts = Counter(token for token in tokens if token.lower() not in excluded_terms)
+            
+            for token, count in sorted(token_counts.items(), key=lambda x: x[1], reverse=True):
+                contexts = []
+                for sentence in sentences:
+                    if token in sentence and len(contexts) < 2:  # Limit to 2 contexts
+                        # Highlight the token in the sentence
+                        escaped_token = re.escape(token)
+                        highlighted = re.sub(
+                            escaped_token,
+                            f"<b>{token}</b>",
+                            sentence,
+                            flags=re.IGNORECASE
+                        )
+                        contexts.append(highlighted)
+                
+                if contexts:
+                    context_str = ", ".join([f'"{c}"' for c in contexts])
+                    if freq_flag:
+                        result_lines.append(f"{token}; {count}; [{context_str}]")
+                    else:
+                        result_lines.append(f"{token}; [{context_str}]")
         else:
-            if freq_flag:
-                output_lines.append(f"{key}; {count}")
-            else:
-                output_lines.append(f"{key}")
-
-    return _format_output(output_lines, prompt_flag, src_flag, text)
+            # Simple token list without frequencies
+            unique_tokens = set(token for token in tokens if token.lower() not in excluded_terms)
+            for token in sorted(unique_tokens):
+                result_lines.append(token)
+    
+    return "\n".join(result_lines) + "\n"
 
 
 def split_sentences(text: str) -> List[str]:
@@ -122,148 +260,24 @@ def split_sentences(text: str) -> List[str]:
 
 
 def get_available_languages():
-    """Get a list of all available languages (built-in + plugins)."""
-    import importlib.util
-    import pkgutil
-    import logging
-    from .languages import __path__ as languages_path
-    
-    # Get built-in languages
-    builtin_languages = []
-    for _, module_name, _ in pkgutil.iter_modules(languages_path):
-        if module_name not in ["__init__", "base"]:  # Include all language modules including generic
-            builtin_languages.append(module_name)
-    
-    # Get plugin languages
-    plugin_languages = []
+    """Get a list of all available languages (plugins only + base)."""
     try:
-        # For Python 3.8+ with importlib.metadata, for older versions we use importlib_metadata
-        try:
-            from importlib.metadata import entry_points
-        except ImportError:
-            import importlib_metadata as metadata
-            entry_points = metadata.entry_points
-        
-        # Check which version of entry_points API is available
-        eps_obj = entry_points()
-        if hasattr(eps_obj, 'select'): # 3.10+ syntax: entry_points() returns a selection object
-            language_eps = eps_obj.select(group='blitzer.languages')
-            logging.debug(f"Found {len(language_eps)} language entry points via select: {[ep.name for ep in language_eps]}")
-        else: # 3.8-3.9 syntax: entry_points() returns a dict-like object
-            language_eps = eps_obj.get('blitzer.languages', [])
-            logging.debug(f"Found {len(language_eps)} language entry points via get: {[ep.name for ep in language_eps]}")
-        
-        for ep in language_eps:
-            logging.debug(f"Processing entry point: {ep.name} -> {ep.value}")
-            try:
-                # Try loading the processor function to ensure it's valid
-                processor_func = ep.load()
-                logging.debug(f"Successfully loaded processor for {ep.name}")
-                plugin_languages.append(ep.name)
-            except Exception as e:
-                logging.debug(f"Failed to load processor for {ep.name}: {e}")
-                # Still add to plugin_languages but we might want to validate differently
-                plugin_languages.append(ep.name)
-    except Exception as e:
-        logging.debug(f"Exception in plugin discovery: {e}")
-        import traceback
-        logging.debug(f"Traceback: {traceback.format_exc()}")
-        pass  # If plugin discovery fails, continue with just builtin languages
-    
-    logging.debug(f"Builtin languages: {builtin_languages}")
-    logging.debug(f"Plugin languages: {plugin_languages}")
-    
-    return sorted(set(builtin_languages + plugin_languages))
-
-
-def get_language_processor(language_code: str):
-    """Dynamically load processor for the language, with fallback to base."""
-    import logging
-    import importlib
-    config_dir = get_config_dir()
-    lexicon_db_path = config_dir / f"{language_code}_lexicon.db"
-    exclusion_path = config_dir / f"{language_code}_exclusion.txt"
-    exclusion_terms = []
-    if exclusion_path.exists():
-        with open(exclusion_path, "r", encoding="utf-8") as f:
-            exclusion_terms = [line.strip().lower() for line in f if line.strip()]
-    
-    # Try to find a language-specific data file in the language_data directory
-    db_path = None
-    if lexicon_db_path.exists():
-        db_path = str(lexicon_db_path)
-    else:
-        # Try to find language-specific data file using data manager
-        db_file_path = get_language_data_path(language_code, f"{language_code}_lexicon.db")
-        if db_file_path:
-            db_path = str(db_file_path)
-    
-    # Try to load via plugin system first
-    try:
-        # For Python 3.8+ with importlib.metadata, for older versions we use importlib_metadata
-        try:
-            from importlib.metadata import entry_points
-        except ImportError:
-            import importlib_metadata as metadata
-            entry_points = metadata.entry_points
-        
-        # Check which version of entry_points API is available
-        eps_obj = entry_points()
-        if hasattr(eps_obj, 'select'):
-            # Python 3.10+ syntax: entry_points() returns a selection object
-            language_eps = eps_obj.select(group='blitzer.languages')
-            logging.debug(f"Found {len(language_eps)} language entry points for {language_code}: {[ep.name for ep in language_eps]}")
-        else:
-            # Python 3.8-3.9 syntax: entry_points() returns a dict-like object
-            language_eps = eps_obj.get('blitzer.languages', [])
-            logging.debug(f"Found {len(language_eps)} language entry points for {language_code} via get: {[ep.name for ep in language_eps]}")
-        
-        for ep in language_eps:
-            logging.debug(f"Checking entry point: {ep.name} == {language_code} ?")
-            if ep.name == language_code:
-                logging.debug(f"Found matching entry point {ep.name}, loading: {ep.value}")
-                try:
-                    processor_func = ep.load()
-                    logging.debug(f"Successfully loaded processor function for {language_code}")
-                    return processor_func(language_code, exclusion_terms, db_path)
-                except Exception as e:
-                    logging.debug(f"Failed to load processor for {language_code}: {e}")
-                    raise  # Re-raise to trigger fallback
-    except Exception as e:
-        logging.debug(f"Exception in plugin loading for {language_code}: {e}")
-        import traceback
-        logging.debug(f"Traceback: {traceback.format_exc()}")
-        pass  # If plugin discovery fails, fall back to builtin
-    
-    # Fall back to built-in languages
-    logging.debug(f"Falling back to built-in language module: {language_code}")
-    try:
-        module = importlib.import_module(f"blitzer_cli.languages.{language_code}")
-        return module.get_processor(language_code, exclusion_terms, db_path)
+        from importlib.metadata import entry_points
     except ImportError:
-        raise ValueError(f"Unsupported language: {language_code}")
-
-
-def _format_output(
-    output_lines: List[str], prompt_flag: bool, src_flag: bool, source_text: str
-) -> str:
-    """Format output with optional prompt and source text."""
-    result = []
-    if src_flag:
-        result.extend(["SOURCE TEXT:", "", source_text, "", "------"])
-    if prompt_flag:
-        result.extend(
-            [
-                "PROMPT:",
-                "",
-                "Process the following text for vocabulary extraction.",
-                "",
-                "------",
-                "******",
-                "------",
-                "",
-            ]
-        )
-    result.extend(output_lines)
-    result.append("")
-    return "\n".join(result)
+        import importlib_metadata as metadata
+        entry_points = metadata.entry_points
+    
+    # Check which version of entry_points API is available
+    eps_obj = entry_points()
+    if hasattr(eps_obj, 'select'):
+        # Python 3.10+ syntax: entry_points() returns a selection object
+        language_eps = eps_obj.select(group='blitzer.languages')
+    else:
+        # Python 3.8-3.9 syntax: entry_points() returns a dict-like object
+        language_eps = eps_obj.get('blitzer.languages', [])
+    
+    available_languages = ['base', 'generic']  # Add base/generic as always available
+    for ep in language_eps:
+        available_languages.append(ep.name)
+    
+    return sorted(set(available_languages))  # Use set to avoid duplicates

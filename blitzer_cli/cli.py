@@ -19,7 +19,7 @@ def cli():
 
 @cli.command("blitz", help="Return wordlist from text.")
 @click.option("--text", "-t", help="Direct text input (overrides stdin).")
-@click.option("--language_code", "-l", required=True, help="ISO 639 three-character language code or \"generic\" for simple processing.\"")
+@click.option("--language_code", "-l", required=True, help="ISO 639 three-character language code or \"base\"/\"generic\" for simple processing.")
 @click.option("--lemmatize", "-L", is_flag=True, help="Treats different declensions/forms of the same word as one word.")
 @click.option("--freq", "-f", is_flag=True, help="Includes word frequency count in output.")
 @click.option("--context", "-c", is_flag=True, help="Includes sample context for each word in output.")

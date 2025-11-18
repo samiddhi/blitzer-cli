@@ -32,3 +32,140 @@ Since I envision each program as having the same exact db structure, the functio
   + perhaps for some languages this wouldn't even require a database, or perhaps there are cases where the standard database would not be a feasible approach. Perhaps some languages might lend themselves to a context aware lemmatization such that it can discern which is the correct lemma. For these reasons, make this optionally available, but strongly discouraged in favor of the standard database structure.
 
     Am I missing anything?
+
+
+** Prompts
+
+### 1. Core Philosophy (repeat this to every contributor)
+- The core blitzer-cli package must stay stupidly small and generic.
+- All language-specific logic lives in separately installable PyPI packages.
+- A language pack is allowed to contain exactly four things and nothing more:
+  - One SQLite database (lemmas.db) with a fixed schema (see below)
+  - Zero or one tiny text-normalizer function (almost always <15 lines)
+  - Zero or one custom tokenizer function (only for real outliers: Chinese, Japanese, Korean, Thai, etc.)
+  - Zero or one custom lemmatizer (strongly discouraged — only if database lookup is genuinely impossible)
+- Everything else is handled by the core. No exceptions.
+
+### 2. Fixed Database Schema (non-negotiable)
+Every lemmas.db is of this schema (except for the extremely rare and discouraged case where there is custom lemmatization):
+
+```sql
+CREATE TABLE IF NOT EXISTS "Forms" (
+    id INTEGER,
+    lemma_id INTEGER,
+    form_representation TEXT
+);
+CREATE INDEX idx_form_rep ON Forms(form_representation);
+CREATE TABLE lookup (
+    lookup_key VARCHAR NOT NULL PRIMARY KEY,
+    headwords VARCHAR NOT NULL
+);
+CREATE TABLE Lemmas (
+    id INTEGER PRIMARY KEY,
+    lemma TEXT
+);
+```
+
+- You may add extra tables (pos, examples, etc.) — the core will ignore them unless you write a custom lemmatizer that uses them.
+- Build the DB with the exact same canonical forms you will enforce in the normalizer, or build the normalizer to match the DB's standards (e.g. using all ṃ instead of ṁ/ŋ in pali, etc.)
+
+### 3. Language Pack Structure (exact template)
+Every blitzer-language-xxx package must be installable with pip and contain the following structure or similar:
+
+```
+blitzer_language_xxx/
+├── __init__.py or language_xxx.py
+├── pyproject.toml or setup.py
+└── lemmas.db
+```
+
+The only mandatory Python code is a register() function exposed via entry_points.
+
+Example register() signature (this is the contract):
+
+```python
+def register():
+    return {
+        "db_path": str(path_to_lemmas.db),   # must be absolute or resolvable via importlib.resources
+        "normalizer": normalizer_func or None,
+        "tokenizer": tokenizer_func or None,         # None → core uses ICU
+        "custom_lemmatizer": lemmatizer_func or None # almost never used
+    }
+```
+
+Entry point in pyproject.toml:
+
+```toml
+[project.entry-points."blitzer.languages"]
+xxx = "blitzer_language_xxx:register"
+```
+
+That is the entire language-specific code for 90% of packs. Yes, really.
+
+### 4. Core Processing Pipeline (exact order, no deviations)
+When blitzer_cli.processor.process_text is called:
+
+1. Load the language via entry point → get the dict from register().
+2. Normalization  
+   - If language provides normalizer → apply it to the raw input text.  
+   - Else → text.lower() only (or NFKC + lower if you want to be safe).
+   - Purpose: make messy real-world input match the pristine forms in the DB. This is where Pali fixes ṁ/ṁ/ŋ, Turkish fixes İ/i, German ß→ss, etc.
+3. Tokenization  
+   - If language provides tokenizer → use it exactly (returns list[str]).  
+   - Else → fall back to ICU (pyicu) word break iterator with default rules.  
+     This handles 95% of languages perfectly: all European, Vietnamese, romanized Indic (Pali, Sanskrit), Greek, Cyrillic, Arabic script (rough but acceptable), etc.
+   - ICU is mandatory dependency of the core (pyicu + icu C library). No discussion.
+4. Lemmatization (only if --lemmatize/-L)  
+   - If language provides custom_lemmatizer → call it with the token list and trust it completely.  
+   - Else → Open SQLite connection to db_path (cache per language in memory for the process lifetime). for each token:  
+     SELECT lemma FROM lemmas WHERE form = ? COLLATE NOCASE  
+     → if zero rows → keep surface token  
+     → if one row → use that lemma  
+     → if multiple rows → duplicate the entry for each possible lemma (exactly as you wanted: “wind” → “wind (n)”, “to wind”)
+5. Post-processing (frequency, context, ranking, etc.) stays in core using the same DB connection.
+
+### 5. When You Are Allowed to Override Tokenization (strict rules)
+Only these cases justify a custom tokenizer — anything else uses ICU:
+
+- Chinese (any variant) → jieba or stanford-segmenter
+- Japanese → sudachi, mecab, or kuromoji
+- Korean mixed script → kiwipiepy or mecab-ko
+- Classical Mongolian vertical script, Maya glyphs, etc. (extremely rare)
+- If you honestly believe ICU butchers your language and you have benchmarks proving it
+
+Even Thai/Lao/Khmer/Burmese usually do NOT need it — ICU’s built-in dictionary breaking is good enough for vocabulary extraction.
+
+### 6. Default ICU Tokenizer Implementation (core must provide this)
+Core fallback:
+
+```python
+import icu
+
+def icu_tokenize(text: str) -> list[str]:
+    bi = icu.BreakIterator.createWordInstance(icu.Locale.getRoot())  # or getEnglish(), doesn't matter much
+    bi.setText(text)
+    tokens = []
+    start = bi.first()
+    for end in bi:
+        token = text[start:end]
+        if token.strip() and not token.isspace():
+            tokens.append(token)
+        start = end
+    return tokens
+```
+
+Punctuation is automatically excluded by UAX#29 word rules — exactly what we want.
+
+### 7. What the CLI Already Does Correctly (do NOT change)
+- languages install/uninstall → pip install/uninstall blitzer-language-xxx  
+  This stays exactly as written. It is perfect.
+- blitz command passes language_code → core resolves via entry points.
+
+### 8. Summary of Who Does What
+- Core (blitzer-cli): ICU tokenizer, generic SQL lemmatizer, pipeline orchestration, entry-point loading, all flags handling.
+- Language pack author: ship a correct lemmas.db + (usually) a 5–15 line normalizer + (rarely) a tokenizer + (almost never) a custom lemmatizer.
+- End user: pip install blitzer-language-pali → everything just works.
+
+This is the minimal, extensible, automatable design that actually survives contact with real languages. Anything more complex and you’re just creating busywork. Anything less and you can’t support Chinese or Pali properly.
+
+Lock it in. Build it exactly like this. No “creative improvements” — the creativity was in making it this stupidly simple while still working.

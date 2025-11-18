@@ -15,16 +15,13 @@ dependencies = [
     "importlib-metadata; python_version < '3.8'",  # For plugin discovery in older Python
     "requests",  # For downloading language data files
     "tomli; python_version < '3.11'",  # TOML support for older Python versions
+    "regex",  # Better regex support with Unicode properties
 ]
 
 [project.scripts]
 blitzer = "blitzer_cli.cli:cli"
 
 [project.entry-points."blitzer.languages"]
-# Built-in language processors
-pli = "blitzer_cli.languages.pli:get_processor"
-slv = "blitzer_cli.languages.slv:get_processor"
-generic = "blitzer_cli.languages.generic:get_processor"
 
 [tool.setuptools.packages.find]
 where = ["."]

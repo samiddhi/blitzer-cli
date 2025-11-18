@@ -1,2 +1,4 @@
 blitzer_cli
-test_language_pack
+blitzer_language_slv
+example_plugins
+test_slv_plugin

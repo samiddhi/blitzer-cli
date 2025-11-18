@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: blitzer-cli
-Version: 0.0.2
+Version: 0.0.3
 Summary: A minimalist CLI tool for language text processing
 Author: Blitzer Team
 License: MIT
@@ -10,3 +10,4 @@ Requires-Dist: click
 Requires-Dist: importlib-metadata; python_version < "3.8"
 Requires-Dist: requests
 Requires-Dist: tomli; python_version < "3.11"
+Requires-Dist: regex
