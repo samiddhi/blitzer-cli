@@ -5,19 +5,10 @@ Accepts text via stdin and outputs word lists via stdout.
 """
 
 import sys
+import subprocess
 import click
-import pkgutil
-from blitzer_cli.processor import process_text
+from blitzer_cli.processor import process_text, get_available_languages
 from blitzer_cli.config import load_config
-from blitzer_cli.languages import __path__ as languages_path
-
-
-def get_supported_languages():
-    supported = []
-    for _, module_name, _ in pkgutil.iter_modules(languages_path):
-        if module_name not in ["__init__", "base"]:  # Exclude abstract base class
-            supported.append(module_name)
-    return supported
 
 
 @click.group(invoke_without_command=False)
@@ -65,10 +56,55 @@ def blitz(text, language_code, lemmatize, freq, context, prompt, src):
         print(f"Error processing text: {e}", file=sys.stderr)
         sys.exit(1)
 
+
 @cli.command("list", help="Lists supported languages for lemmatization.")
 def list_languages():
-    for lang in get_supported_languages():
+    for lang in get_available_languages():
         click.echo(lang)
+
+
+@cli.command("languages", help="Manage language packs.")
+@click.argument('action', type=click.Choice(['install', 'uninstall', 'list']))
+@click.argument('language_code', required=False)
+def manage_languages(action, language_code):
+    if action == 'list':
+        click.echo("Available languages:")
+        for lang in get_available_languages():
+            click.echo(f"  - {lang}")
+    elif action == 'install':
+        if not language_code:
+            click.echo("Please specify a language code to install.", err=True)
+            raise click.Abort()
+        
+        package_name = f"blitzer-language-{language_code}"
+        click.echo(f"Installing language pack: {package_name}")
+        
+        try:
+            result = subprocess.run([sys.executable, "-m", "pip", "install", package_name], 
+                                  capture_output=True, text=True, check=True)
+            click.echo(f"Successfully installed {package_name}")
+            click.echo(result.stdout)
+        except subprocess.CalledProcessError as e:
+            click.echo(f"Failed to install {package_name}: {e}")
+            click.echo(e.stderr)
+            sys.exit(1)
+    elif action == 'uninstall':
+        if not language_code:
+            click.echo("Please specify a language code to uninstall.", err=True)
+            raise click.Abort()
+        
+        package_name = f"blitzer-language-{language_code}"
+        click.echo(f"Uninstalling language pack: {package_name}")
+        
+        try:
+            result = subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", package_name], 
+                                  capture_output=True, text=True, check=True)
+            click.echo(f"Successfully uninstalled {package_name}")
+            click.echo(result.stdout)
+        except subprocess.CalledProcessError as e:
+            click.echo(f"Failed to uninstall {package_name}: {e}")
+            click.echo(e.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":

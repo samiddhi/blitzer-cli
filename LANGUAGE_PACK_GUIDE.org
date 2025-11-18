@@ -1,0 +1,271 @@
+#+TITLE: Creating a Language Pack for Blitzer CLI
+#+AUTHOR: Blitzer Team
+#+OPTIONS: toc:nil num:nil
+
+This guide explains how to create a downloadable language pack for Blitzer CLI. Language packs are separate Python packages that can be installed via pip and integrate with the Blitzer CLI through a plugin architecture.
+
+* Overview
+
+A language pack is a Python package with the naming convention =blitzer-language-[lang-code]= that:
+1. Implements the required language processor interface
+2. Defines an entry point that Blitzer CLI can discover
+3. Optionally includes data files like lexicon databases
+4. Can be distributed as a pip-installable package
+
+* Prerequisites
+
+- Python 3.7+
+- Basic knowledge of Python packaging
+- Understanding of your target language's linguistic features (tokenization, lemmatization, etc.)
+
+* Step-by-Step Guide
+
+** Step 1: Create Project Structure
+
+Create a directory for your language pack with the following structure:
+
+#+BEGIN_EXAMPLE
+blitzer-language-[lang-code]/
+├── setup.py (or pyproject.toml)
+├── blitzer_language_[lang-code]/
+│   ├── __init__.py
+│   ├── [lang_code]_processor.py
+│   └── [optional_data_files.db]
+└── README.md
+#+END_EXAMPLE
+
+For example, for a French language pack:
+#+BEGIN_EXAMPLE
+blitzer-language-fra/
+├── setup.py
+├── blitzer_language_fra/
+│   ├── __init__.py
+│   ├── fra_processor.py
+│   └── fra_lexicon.db
+└── README.md
+#+END_EXAMPLE
+
+** Step 2: Implement the Language Processor
+
+Create your processor class that extends =BaseLanguageProcessor=:
+
+#+BEGIN_SRC python
+"""[Language Name] language processor."""
+
+import re
+import sqlite3
+from typing import List, Optional, Dict
+from blitzer_cli.languages.base import BaseLanguageProcessor
+
+
+class [LanguageName]Processor(BaseLanguageProcessor):
+    """[Language Name]-specific text processing."""
+    
+    def __init__(self, language_code: str, exclusion_list: List[str], lexicon_db_path: Optional[str] = None):
+        super().__init__(language_code, exclusion_list, lexicon_db_path)
+        self._connect_db()
+        self.exclusion_list = exclusion_list  # Adjust normalization as needed
+
+    def tokenize_words(self, text: str) -> List[str]:
+        # [Language Name] specific tokenization
+        # Handle special characters, diacritics, etc.
+        words = re.findall(r"[a-zA-ZÀ-ÿ'-]+", text, re.IGNORECASE)
+        return [word.lower() for word in words]
+
+    def lemmatize(self, word: str) -> List[str]:
+        lemmas = []
+        if not self.conn:
+            # If no database, return the word as-is
+            return [word.lower()]
+
+        cursor = self.conn.cursor()
+        try:
+            # Query your database for lemmatization
+            # This example assumes a lookup table with headwords
+            cursor.execute("SELECT headwords FROM lookup WHERE lookup_key = lower(?)", (word,))
+            result = cursor.fetchone()
+
+            if result and result[0]:
+                headwords_str = result[0].strip('[]')
+                if headwords_str:
+                    # Parse the bracketed, comma-separated list of IDs
+                    id_strings = [s.strip() for s in headwords_str.split(',')]
+                    int_ids = [int(s) for s in id_strings if s.isdigit()]
+
+                    if int_ids:
+                        # Create placeholders for the IN clause
+                        placeholders = ', '.join('?' * len(int_ids))
+
+                        # Query for the actual lemmas
+                        cursor.execute(f"SELECT lemma FROM [your_lemma_table] WHERE id IN ({placeholders})", tuple(int_ids))
+                        lemma_results = cursor.fetchall()
+                        for lemma_result in lemma_results:
+                            lemmas.append(lemma_result[0].lower())
+
+            return list(set(lemmas)) if lemmas else [word.lower()]
+        except Exception as e:
+            print(f"Error lemmatizing '{word}': {e}")
+            return [word.lower()]
+
+    def normalize(self, text: str) -> str:
+        """Normalize [language name] text."""
+        # Implement normalization specific to your language
+        # This might include handling diacritics, special characters, etc.
+        return text.lower()
+
+
+def get_processor(language_code: str, exclusion_list: List[str], lexicon_db_path: Optional[str] = None):
+    """Factory function to create and return a [LanguageName]Processor instance."""
+    return [LanguageName]Processor(language_code, exclusion_list, lexicon_db_path)
+            #+END_SRC
+
+** Step 3: Create setup.py or pyproject.toml
+
+*** Option A: Using setup.py
+
+#+BEGIN_SRC python
+from setuptools import setup, find_packages
+
+setup(
+    name="blitzer-language-[lang-code]",
+    version="0.1.0",
+    description="[Language Name] language pack for Blitzer CLI",
+    author="[Your Name]",
+    author_email="[your.email@example.com]",
+    packages=find_packages(),
+    package_data={
+        '[package_name]': ['*.db'],  # Include database files
+    },
+    include_package_data=True,
+    install_requires=[
+        "blitzer-cli",  # This ensures compatibility
+    ],
+    entry_points={
+        'blitzer.languages': [
+            '[lang-code] = [package_name].[lang_code]_processor:get_processor',
+        ]
+    },
+    python_requires='>=3.7',
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+)
+#+END_SRC
+
+*** Option B: Using pyproject.toml
+
+#+BEGIN_SRC toml
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blitzer-language-[lang-code]"
+version = "0.1.0"
+description = "[Language Name] language pack for Blitzer CLI"
+authors = [{name = "[Your Name]", email = "[your.email@example.com]"}]
+license = {text = "MIT"}
+requires-python = ">=3.7"
+dependencies = [
+    "blitzer-cli",
+]
+
+[project.entry-points."blitzer.languages"]
+[lang-code] = "[package_name].[lang_code]_processor:get_processor"
+
+[tool.setuptools.package-data]
+[package_name] = ["*.db"]
+#+END_SRC
+
+** Step 4: Prepare Your Database (Optional)
+
+If your language supports lemmatization, create a SQLite database with appropriate tables. The exact schema depends on your implementation, but common patterns include:
+
+- =lookup= table: Maps word forms to lemma IDs
+- =dpd_headwords= or similar: Contains lemma information with definitions and grammar data
+
+Your database should be packaged with your language pack and accessed from within the installed package.
+
+** Step 5: Test Your Language Pack
+
+1. Install your language pack in development mode:
+   #+BEGIN_SRC sh
+   pip install -e .
+   #+END_SRC
+
+2. Test that it's recognized by Blitzer CLI:
+   #+BEGIN_SRC sh
+   blitzer languages list
+   #+END_SRC
+
+3. Test basic functionality:
+   #+BEGIN_SRC sh
+   echo "Your test text here" | blitzer blitz -l [lang-code]
+   #+END_SRC
+
+4. Test with lemmatization if applicable:
+   #+BEGIN_SRC sh
+   echo "Your test text here" | blitzer blitz -l [lang-code] --lemmatize
+   #+END_SRC
+
+** Step 6: Distribute Your Language Pack
+
+Once tested, you can distribute your language pack:
+
+1. Build the package:
+   #+BEGIN_SRC sh
+   python -m build
+   #+END_SRC
+
+2. Upload to PyPI:
+   #+BEGIN_SRC sh
+   python -m twine upload dist/*
+   #+END_SRC
+
+Or simply provide the source code for others to install directly:
+#+BEGIN_SRC sh
+pip install git+https://github.com/yourusername/blitzer-language-[lang-code].git
+#+END_SRC
+
+* Example: Complete French Language Pack
+
+For a complete example, see the test language pack in the Blitzer CLI repository which demonstrates all the required components.
+
+* Entry Point Requirements
+
+Your language pack must register an entry point under the group =blitzer.languages= with:
+- Name: The language code (e.g., "fra", "spa", "deu")
+- Value: The import path to your =get_processor= function
+
+* Required Methods
+
+Your processor class must implement these abstract methods from =BaseLanguageProcessor=:
+- =tokenize_words(text: str) -> List[str]=
+- =lemmatize(word: str) -> List[str]=
+- =get_definition(lemma: str) -> Optional[str]=
+- =get_grammar_data(lemma: str) -> Optional[Dict]=
+- =normalize(text: str) -> str=
+
+* Optional Enhancements
+
+Consider adding:
+- Comprehensive exclusion lists
+- Advanced tokenization rules
+- Multiple database files for different aspects
+- Language-specific configuration options
+- Documentation and examples
+
+* Troubleshooting
+
+If your language pack doesn't appear in =blitzer languages list=:
+1. Verify the entry point is correctly defined
+2. Check that your package depends on =blitzer-cli=
+3. Make sure the =get_processor= function exists and is importable
+4. Confirm proper installation with =pip list | grep blitzer-language=
+
+If lemmatization doesn't work:
+1. Verify database file is properly packaged and accessible
+2. Check database schema matches your queries
+3. Ensure proper column names in SQL queries

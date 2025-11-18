@@ -48,3 +48,7 @@ class BaseLanguageProcessor(abc.ABC):
     def normalize(self, text: str) -> str:
         """Normalize text."""
         pass
+
+    def get_language_name(self) -> str:
+        """Get the human-readable name of the language."""
+        return self.language_code.upper()

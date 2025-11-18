@@ -4,6 +4,43 @@ All notable changes to the Blitzer CLI project will be documented in this file.
 
 ** Unreleased
 
+** [0.0.3] - 2025-11-17
+
+*** Added
+
+- *Implemented plugin architecture with entry points*
+  - Added entry point system for downloadable language packs via =blitzer.languages= group
+  - Created dynamic discovery and loading system for external processors
+  - Added backward compatibility for different Python versions (3.8-3.12)
+
+- *Added language management commands*
+  - =blitzer languages list= to show all available languages (built-in and plugins)
+  - =blitzer languages install <lang-code>= to install language packs via pip
+  - =blitzer languages uninstall <lang-code>= to remove language packs
+
+- *Created comprehensive test language pack (tst)*
+  - Complete example plugin with SQLite database and processor implementation
+  - Proper package structure with entry point definition
+  - Database file bundled with the language pack
+
+- *Implemented data file management*
+  - Added =data_manager.py= for handling language-specific data files
+  - Created utilities for downloading and caching language databases
+  - Standardized data directory structure at =~/.config/blitzer/language_data/<lang>=
+
+*** Changed
+
+- Updated =get_available_languages()= to discover both built-in and plugin languages
+- Improved error handling for plugin loading with better exception management
+- Enhanced processor loading to work with both built-in modules and external plugins
+- Updated =pyproject.toml= to include plugin entry points for built-in languages
+
+*** Fixed
+
+- Fixed Python version compatibility issues with =importlib.metadata.entry_points()= API
+- Resolved issue where external plugins weren't being discovered due to API misuse
+- Corrected exception handling that was silently swallowing plugin discovery errors
+
 ** [0.0.2] - 2025-11-16
 
 *** Changed

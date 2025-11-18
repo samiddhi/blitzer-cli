@@ -1,1 +1,2 @@
 blitzer_cli
+test_language_pack

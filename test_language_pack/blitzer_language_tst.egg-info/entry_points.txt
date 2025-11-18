@@ -1,0 +1,2 @@
+[blitzer.languages]
+tst = blitzer_language_tst.tst_processor:get_processor

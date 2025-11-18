@@ -1,2 +1,7 @@
+[blitzer.languages]
+generic = blitzer_cli.languages.generic:get_processor
+pli = blitzer_cli.languages.pli:get_processor
+slv = blitzer_cli.languages.slv:get_processor
+
 [console_scripts]
 blitzer = blitzer_cli.cli:cli
