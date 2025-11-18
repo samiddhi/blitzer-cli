@@ -46,7 +46,7 @@ def create_default_config(config_file):
 # This file uses TOML format
 
 # Default settings
-default_language = "generic"  # Default language code
+default_language = "base"  # Default language code ('generic' is equivalent but 'base' is preferred)
 default_mode = "word_list"  # Default processing mode
 
 # Output settings

@@ -26,6 +26,7 @@ All notable changes to the Blitzer CLI project will be documented in this file.
 - Updated plugin system to use =register()= functions instead of processor classes
 - Simplified plugin interface with configurable normalizers, tokenizers, and lemmatizers
 - Enhanced plugin discovery and error handling
+- Language listing now only shows 'base' instead of both 'base' and 'generic' (both still function equivalently)
 
 *** Removed
 

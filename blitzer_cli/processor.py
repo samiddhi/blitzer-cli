@@ -289,7 +289,7 @@ def get_available_languages():
         # Python 3.8-3.9 syntax: entry_points() returns a dict-like object
         language_eps = eps_obj.get('blitzer.languages', [])
     
-    available_languages = ['base', 'generic']  # Add base/generic as always available
+    available_languages = ['base']  # Add base as always available (generic is equivalent but not listed separately)
     for ep in language_eps:
         available_languages.append(ep.name)
     

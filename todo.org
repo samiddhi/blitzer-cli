@@ -1,8 +1,6 @@
 * TO-DO
 ** High Priority
-- [ ] Convert generic, slv, and pli to regular plugins that are downloaded upon install - they should be fundamentally no different from any other language pack.
-  - [ ] Clean up whatever remains from the old "built-in" languages implementation. There should be no trace of any of this left
-  - [ ] Update the changelog
+- [ ] Update the config nightmare
 
 ** Low Priority
 - [ ] Ensure that each language can have its own custom prompt set in the config (not in the language plugin! this is for users, not developers) rather than hardcoding a generic prompt into the core python. If no prompt is set for the specified language, a warning should be given in red text in the cli, and the command executed as if the flag were not used.
