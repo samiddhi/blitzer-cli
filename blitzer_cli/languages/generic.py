@@ -20,14 +20,6 @@ class GenericProcessor(BaseLanguageProcessor):
         """Return the word as-is (no lemmatization)."""
         return [word.lower()]
 
-    def get_definition(self, lemma: str) -> Optional[str]:
-        """No definition support."""
-        return None
-
-    def get_grammar_data(self, lemma: str) -> Optional[Dict]:
-        """No grammar data support."""
-        return None
-
     def normalize(self, text: str) -> str:
         """No special normalization."""
         return text

@@ -57,20 +57,13 @@ def blitz(text, language_code, lemmatize, freq, context, prompt, src):
         sys.exit(1)
 
 
-@cli.command("list", help="Lists supported languages for lemmatization.")
-def list_languages():
-    for lang in get_available_languages():
-        click.echo(lang)
-
-
 @cli.command("languages", help="Manage language packs.")
 @click.argument('action', type=click.Choice(['install', 'uninstall', 'list']))
 @click.argument('language_code', required=False)
 def manage_languages(action, language_code):
     if action == 'list':
-        click.echo("Available languages:")
         for lang in get_available_languages():
-            click.echo(f"  - {lang}")
+            click.echo(lang)
     elif action == 'install':
         if not language_code:
             click.echo("Please specify a language code to install.", err=True)

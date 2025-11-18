@@ -35,6 +35,10 @@ All notable changes to the Blitzer CLI project will be documented in this file.
 - Enhanced processor loading to work with both built-in modules and external plugins
 - Updated =pyproject.toml= to include plugin entry points for built-in languages
 
+*** Removed
+
+- =blitzer list= superseded by =blitzer languages list=
+
 *** Fixed
 
 - Fixed Python version compatibility issues with =importlib.metadata.entry_points()= API

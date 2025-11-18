@@ -58,28 +58,6 @@ class SlovenianProcessor(BaseLanguageProcessor):
             print(f"Error lemmatizing '{word}': {e}")
             return [word.lower()]
 
-    def get_definition(self, lemma: str) -> Optional[str]:
-        if not self.conn:
-            return None
-
-        cursor = self.conn.cursor()
-        try:
-            # Query 'Lemmas' table for the definition (assuming meaning is in the lemma field)
-            cursor.execute("SELECT lemma FROM Lemmas WHERE lemma = ? COLLATE NOCASE LIMIT 1", (lemma,))
-            result = cursor.fetchone()
-            return result[0] if result else None
-        except sqlite3.Error as e:
-            print(f"Error getting definition for '{lemma}': {e}")
-            return None
-
-    def get_grammar_data(self, lemma: str) -> Optional[Dict]:
-        if not self.conn:
-            return None
-
-        # Placeholder implementation - Slovenian DB structure might be different
-        # This would need to be customized based on the actual schema of the Slovenian lexicon.db
-        return None
-
     def normalize(self, text: str) -> str:
         """Normalize Slovenian text (default implementation)."""
         return text

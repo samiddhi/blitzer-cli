@@ -35,16 +35,6 @@ class BaseLanguageProcessor(abc.ABC):
         pass
     
     @abc.abstractmethod
-    def get_definition(self, lemma: str) -> Optional[str]:
-        """Get definition for a lemma."""
-        pass
-    
-    @abc.abstractmethod
-    def get_grammar_data(self, lemma: str) -> Optional[Dict]:
-        """Get grammar data for a lemma."""
-        pass
-    
-    @abc.abstractmethod
     def normalize(self, text: str) -> str:
         """Normalize text."""
         pass

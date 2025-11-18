@@ -69,40 +69,6 @@ class PaliProcessor(BaseLanguageProcessor):
             print(f"Error lemmatizing '{word}': {e}")
             return [word.lower()]
 
-    def get_definition(self, lemma: str) -> Optional[str]:
-        if not self.conn:
-            return None
-
-        cursor = self.conn.cursor()
-        try:
-            # Query 'dpd_headwords' table for the definition (meaning_1)
-            cursor.execute("SELECT meaning_1 FROM dpd_headwords WHERE lemma_1 = ? COLLATE NOCASE LIMIT 1", (lemma,))
-            result = cursor.fetchone()
-            return result[0] if result else None
-        except sqlite3.Error as e:
-            print(f"Error getting definition for '{lemma}': {e}")
-            return None
-
-    def get_grammar_data(self, lemma: str) -> Optional[Dict]:
-        if not self.conn:
-            return None
-
-        cursor = self.conn.cursor()
-        try:
-            # Query 'dpd_headwords' table for POS and other grammar data
-            # Based on schema, 'pos' is available. Other grammar details like Case, Number, Gender are not explicitly mentioned.
-            cursor.execute("SELECT pos FROM dpd_headwords WHERE lemma_1 = ? COLLATE NOCASE LIMIT 1", (lemma,))
-            result = cursor.fetchone()
-            if result:
-                grammar_data = {
-                    "POS": result[0]
-                }
-                return {k: v for k, v in grammar_data.items() if v is not None}
-            return None
-        except sqlite3.Error as e:
-            print(f"Error getting grammar data for '{lemma}': {e}")
-            return None
-
     def normalize(self, text: str) -> str:
         """
         Normalize pali notation to ensure exclusion list and text are not mismatched.
