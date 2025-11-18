@@ -7,7 +7,7 @@ This guide explains how to create a downloadable language pack for Blitzer CLI. 
 * Overview
 
 A language pack is a Python package with the naming convention =blitzer-language-[lang-code]= that:
-1. Implements the required language processor interface
+1. Provides a =register()= function that returns language configuration
 2. Defines an entry point that Blitzer CLI can discover
 3. Optionally includes data files like lexicon databases
 4. Can be distributed as a pip-installable package
@@ -29,7 +29,6 @@ blitzer-language-[lang-code]/
 ├── setup.py (or pyproject.toml)
 ├── blitzer_language_[lang-code]/
 │   ├── __init__.py
-│   ├── [lang_code]_processor.py
 │   └── [optional_data_files.db]
 └── README.md
 #+END_EXAMPLE
@@ -40,84 +39,64 @@ blitzer-language-fra/
 ├── setup.py
 ├── blitzer_language_fra/
 │   ├── __init__.py
-│   ├── fra_processor.py
 │   └── fra_lexicon.db
 └── README.md
 #+END_EXAMPLE
 
-** Step 2: Implement the Language Processor
+** Step 2: Implement the Language Configuration
 
-Create your processor class that extends =BaseLanguageProcessor=:
+Create your =__init__.py= file with a =register()= function that returns language configuration:
 
 #+BEGIN_SRC python
-"""[Language Name] language processor."""
+"""[Language Name] language plugin for blitzer."""
 
 import re
-import sqlite3
-from typing import List, Optional, Dict
-from blitzer_cli.languages.base import BaseLanguageProcessor
+from pathlib import Path
 
 
-class [LanguageName]Processor(BaseLanguageProcessor):
-    """[Language Name]-specific text processing."""
+def normalizer_func(text: str) -> str:
+    """
+    Normalize [language name] notation to ensure exclusion list and text are not mismatched.
+    """
+    # Implement normalization specific to your language
+    # This might include handling diacritics, special characters, etc.
+    return text.lower()
+
+
+def tokenizer_func(text: str) -> list[str]:
+    """
+    Tokenize text according to [language name] rules.
+    """
+    # [Language Name] specific tokenization
+    # Handle special characters, diacritics, etc.
+    import regex
+    tokens = regex.findall(r"\p{L}+(?:[\p{M}\p{N}'\-]+\p{L}+)*", text.lower())
+    return tokens
+
+
+def lemmatizer_func(tokens: list[str]) -> list[str]:
+    """
+    Custom lemmatizer function for [language name].
+    """
+    # Implement custom lemmatization logic
+    # This is an alternative to using the SQL-based lemmatizer
+    # If using SQL-based lemmatization (with database), this can return the tokens as-is
+    # or implement your own mapping logic
+    return tokens
+
+
+def register():
+    """Register function that returns language configuration."""
+    # Get the path to your bundled database file
+    db_path = str(Path(__file__).parent / "lemmas.db")
     
-    def __init__(self, language_code: str, exclusion_list: List[str], lexicon_db_path: Optional[str] = None):
-        super().__init__(language_code, exclusion_list, lexicon_db_path)
-        self._connect_db()
-        self.exclusion_list = exclusion_list  # Adjust normalization as needed
-
-    def tokenize_words(self, text: str) -> List[str]:
-        # [Language Name] specific tokenization
-        # Handle special characters, diacritics, etc.
-        words = re.findall(r"[a-zA-ZÀ-ÿ'-]+", text, re.IGNORECASE)
-        return [word.lower() for word in words]
-
-    def lemmatize(self, word: str) -> List[str]:
-        lemmas = []
-        if not self.conn:
-            # If no database, return the word as-is
-            return [word.lower()]
-
-        cursor = self.conn.cursor()
-        try:
-            # Query your database for lemmatization
-            # This example assumes a lookup table with headwords
-            cursor.execute("SELECT headwords FROM lookup WHERE lookup_key = lower(?)", (word,))
-            result = cursor.fetchone()
-
-            if result and result[0]:
-                headwords_str = result[0].strip('[]')
-                if headwords_str:
-                    # Parse the bracketed, comma-separated list of IDs
-                    id_strings = [s.strip() for s in headwords_str.split(',')]
-                    int_ids = [int(s) for s in id_strings if s.isdigit()]
-
-                    if int_ids:
-                        # Create placeholders for the IN clause
-                        placeholders = ', '.join('?' * len(int_ids))
-
-                        # Query for the actual lemmas
-                        cursor.execute(f"SELECT lemma FROM [your_lemma_table] WHERE id IN ({placeholders})", tuple(int_ids))
-                        lemma_results = cursor.fetchall()
-                        for lemma_result in lemma_results:
-                            lemmas.append(lemma_result[0].lower())
-
-            return list(set(lemmas)) if lemmas else [word.lower()]
-        except Exception as e:
-            print(f"Error lemmatizing '{word}': {e}")
-            return [word.lower()]
-
-    def normalize(self, text: str) -> str:
-        """Normalize [language name] text."""
-        # Implement normalization specific to your language
-        # This might include handling diacritics, special characters, etc.
-        return text.lower()
-
-
-def get_processor(language_code: str, exclusion_list: List[str], lexicon_db_path: Optional[str] = None):
-    """Factory function to create and return a [LanguageName]Processor instance."""
-    return [LanguageName]Processor(language_code, exclusion_list, lexicon_db_path)
-            #+END_SRC
+    return {
+        "db_path": db_path,  # Path to SQLite database for lemmatization (optional)
+        "normalizer": normalizer_func,  # Function to normalize text (optional, can be None)
+        "tokenizer": tokenizer_func,  # Function to tokenize text (optional, can be None)
+        "custom_lemmatizer": lemmatizer_func  # Custom lemmatization function (optional, can be None)
+    }
+#+END_SRC
 
 ** Step 3: Create setup.py or pyproject.toml
 
@@ -142,7 +121,7 @@ setup(
     ],
     entry_points={
         'blitzer.languages': [
-            '[lang-code] = [package_name].[lang_code]_processor:get_processor',
+            '[lang-code] = [package_name]:register',
         ]
     },
     python_requires='>=3.7',
@@ -173,7 +152,7 @@ dependencies = [
 ]
 
 [project.entry-points."blitzer.languages"]
-[lang-code] = "[package_name].[lang_code]_processor:get_processor"
+[lang-code] = "[package_name]:register"
 
 [tool.setuptools.package-data]
 [package_name] = ["*.db"]
@@ -181,10 +160,10 @@ dependencies = [
 
 ** Step 4: Prepare Your Database (Optional)
 
-If your language supports lemmatization, create a SQLite database with appropriate tables. The exact schema depends on your implementation, but common patterns include:
+If your language supports lemmatization, create a SQLite database with appropriate tables. The database format should be compatible with the core lemmatizer which expects:
 
-- =lookup= table: Maps word forms to lemma IDs
-- =dpd_headwords= or similar: Contains lemma information with definitions and grammar data
+- =Forms= table: Maps word forms to lemma IDs (with column =form_representation=)
+- =Lemmas= table: Contains lemma information (with column =id= and =lemma=)
 
 Your database should be packaged with your language pack and accessed from within the installed package.
 
@@ -229,30 +208,33 @@ Or simply provide the source code for others to install directly:
 pip install git+https://github.com/yourusername/blitzer-language-[lang-code].git
 #+END_SRC
 
-* Example: Complete French Language Pack
+* Example Language Pack
 
-For a complete example, see the test language pack in the Blitzer CLI repository which demonstrates all the required components.
+See the example language packs in the =example_plugins= directory which demonstrate the complete structure:
+
+- =blitzer_language_pali=: Pali language plugin with normalization function and bundled database
+- =blitzer_language_slovenian=: Slovenian language plugin with bundled database
 
 * Entry Point Requirements
 
 Your language pack must register an entry point under the group =blitzer.languages= with:
 - Name: The language code (e.g., "fra", "spa", "deu")
-- Value: The import path to your =get_processor= function
+- Value: The import path to your =register= function
 
-* Required Methods
+* Configuration Options
 
-Your processor class must implement these abstract methods from =BaseLanguageProcessor=:
-- =tokenize_words(text: str) -> List[str]=
-- =lemmatize(word: str) -> List[str]=
-- =get_definition(lemma: str) -> Optional[str]=
-- =get_grammar_data(lemma: str) -> Optional[Dict]=
-- =normalize(text: str) -> str=
+Your =register()= function must return a dictionary with the following keys:
+
+- =db_path=: Path to SQLite database for SQL-based lemmatization (can be None)
+- =normalizer=: Function to normalize text (can be None for default normalization) 
+- =tokenizer=: Function to tokenize text (can be None for default regex tokenizer)
+- =custom_lemmatizer=: Custom function to lemmatize tokens (optional, takes list of tokens and returns lemmatized tokens; if provided, it takes precedence over SQL-based lemmatization even if db_path is set)
 
 * Optional Enhancements
 
 Consider adding:
 - Comprehensive exclusion lists
-- Advanced tokenization rules
+- Advanced tokenization rules using the regex library
 - Multiple database files for different aspects
 - Language-specific configuration options
 - Documentation and examples
@@ -260,12 +242,13 @@ Consider adding:
 * Troubleshooting
 
 If your language pack doesn't appear in =blitzer languages list=:
-1. Verify the entry point is correctly defined
+1. Verify the entry point is correctly defined in setup.py/pyproject.toml
 2. Check that your package depends on =blitzer-cli=
-3. Make sure the =get_processor= function exists and is importable
+3. Make sure the =register= function exists and is importable
 4. Confirm proper installation with =pip list | grep blitzer-language=
 
 If lemmatization doesn't work:
 1. Verify database file is properly packaged and accessible
-2. Check database schema matches your queries
-3. Ensure proper column names in SQL queries
+2. Check database schema matches the expected format (Forms and Lemmas tables)
+3. Ensure proper column names in SQL queries (form_representation in Forms, id and lemma in Lemmas)
+4. Test database connection and queries independently

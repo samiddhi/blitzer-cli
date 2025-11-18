@@ -2,7 +2,36 @@
 
 All notable changes to the Blitzer CLI project will be documented in this file.
 
-** Unreleased
+** [0.0.4] - 2025-11-18
+
+*** Added
+
+- *Complete plugin architecture migration*
+  - All language processors are now downloadable as separate plugins
+  - Core package no longer includes any built-in language support
+  - Language packs can be installed/uninstalled dynamically with =blitzer languages install/uninstall=
+
+- *Simplified language plugin structure*
+  - New =register()= function approach for language plugins
+  - Cleaner architecture with dedicated configuration functions
+  - Examples updated to reflect new minimal plugin structure
+
+*** Changed
+
+- *Removed all built-in language processors*
+  - Pali, Slovenian, and other language processors are no longer included in core package
+  - All language functionality now provided through downloadable plugins
+  - Updated language discovery to work exclusively with plugin architecture
+
+- Updated plugin system to use =register()= functions instead of processor classes
+- Simplified plugin interface with configurable normalizers, tokenizers, and lemmatizers
+- Enhanced plugin discovery and error handling
+
+*** Removed
+
+- All built-in language processors (Pali, Slovenian, etc.)
+- Legacy processor class architecture
+- Built-in language data files
 
 ** [0.0.3] - 2025-11-17
 

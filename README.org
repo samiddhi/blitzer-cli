@@ -9,7 +9,7 @@ Blitzer CLI is a minimalist command-line tool for language text processing that 
 
 Optionally (but recommended) users can create and include their own word exclusion lists which will exclude words from the result. This essentially means that as vocabulary is acquired to you and added to this list, the output from this tool will be exclusively words you do not already know. The upfront cost of making and maintaining this exclusion list comes with the benefit of instant custom vocabulary for texts you intent to read, listen to, or study, as well as a way to track how many words you know in your language. Pretty cool!
 
-The tool was designed for language learners and supports downloadable language packs via plugin architecture. Built-in language support includes Slovenian and Pāli (which are oddly specific, but my CLI, my rules!) with new languages installable as separate packages using =blitzer languages install <lang-code>=. Contributions for new languages are warmly accepted, and should be fairly straightforward to implement.
+The tool was designed for language learners and supports completely downloadable language packs via plugin architecture. There are *no built-in language processors* - all language processing capabilities are provided through separate downloadable plugins using the =blitzer languages install <lang-code>= command. This means the core tool is lightweight and users only install the languages they actually need. Contributions for new languages are warmly accepted, and should be fairly straightforward to implement.
 
 * Installation
 
@@ -38,8 +38,7 @@ blitzer blitz -t "Your text here" -l [language_code] [flags]
 
 ** Available Languages
 - =generic= :: Generic processor for space-separated languages (no lemmatization support)
-- =pli= :: Pali (with support for diacritics like ā, ī, ū, ṛ, ḷ, ṅ, ṇ, ñ, ṭ, ḍ, ś, ṣ, ṃ, ṁ)
-- =slv= :: Slovenian (with support for č, š, ž)
+- Downloadable language packs available via plugins (e.g., =blitzer languages install pli= for Pali, =blitzer languages install slv= for Slovenian)
 
 ** Available Commands
 - =blitz= :: Main command for processing text with configurable flags
@@ -73,8 +72,8 @@ echo "To je test." | blitzer blitz -l slv -L
 # Using multiple flags
 echo "This is a test." | blitzer blitz -l pli -L -f -c -p
 
-# List available languages (built-in and plugins)
-blitzer list
+# List available languages (plugins only)
+blitzer languages list
 
 # Manage language packs
 blitzer languages list
@@ -111,24 +110,17 @@ Exclusion lists prevent known words from appearing in output. Language-specific 
 * Language Support
 
 ** Extending Language Support
-The architecture uses a plugin system with entry points to make adding new languages much more dynamic and extensible. There are two ways to add support for new languages:
-
-*For Built-in Languages (included with the main package):*
-1. Create a new file =blitzer_cli/languages/[lang_code].py=
-2. Implement a class extending =BaseLanguageProcessor=
-3. Implement the required methods: =tokenize_words()=, =lemmatize()=, and =normalize()=
-4. Provide a =get_processor()= factory function that creates and returns an instance of your processor
-5. Add an entry point in =pyproject.toml= under =project.entry-points."blitzer.languages"=
+The architecture uses a plugin system with entry points to make adding new languages much more dynamic and extensible. There is now only one way to add support for new languages:
 
 *For Plugin Languages (downloadable packages):*
 1. Create a separate Python package with name format =blitzer-language-[lang_code]=
-2. Include your processor implementation in the package
+2. Include your processor configuration in the package's =__init__.py= file with a =register()= function
 3. Add an entry point in your package's =setup.py= or =pyproject.toml= under =blitzer.languages=
 4. Bundle any required data files (like SQLite databases) with the package
 5. Distribute as a pip-installable package
 
 ** Language Pack Management
-The new =languages= command allows for easy management of downloadable language packs:
+The =languages= command allows for easy management of downloadable language packs:
 
 #+BEGIN_SRC sh
 # List all available languages (built-in and installed plugins)
@@ -142,18 +134,15 @@ blitzer languages uninstall [lang-code]
 #+END_SRC
 
 ** Language Dictionaries
-The tool supports language-specific dictionaries that enable lemmatization when using the =-L= flag. Lemmatization is the process of grouping together the different inflected forms of a word so they can be analyzed as a single item. For example, in Pali, both "deva" and "devo" would be mapped to the same root form "deva". Language dictionaries are stored in SQLite databases following XDG specifications:
+The tool supports language-specific dictionaries that enable lemmatization when using the =-L= flag. Lemmatization is the process of grouping together the different inflected forms of a word so they can be analyzed as a single item. For example, in Pali, both "deva" and "devo" would be mapped to the same root form "deva". Language dictionaries are stored in SQLite databases bundled with language plugins:
 
-- Database location for built-ins: =~/.config/blitzer/[lang_code]_lexicon.db=
 - Database location for plugins: Bundled with the plugin package
 
-The tool looks for these databases but does not create them automatically. When a language dictionary is not available, the tool falls back to basic word processing without lemmatization capabilities.
+The tool looks for these databases in the installed plugins but does not create them automatically. When a language dictionary is not available, the tool falls back to basic word processing without lemmatization capabilities.
 
-** Current Language Processors
-- =PaliProcessor= :: Handles Pali-specific tokenization, normalization, and lemmatization
-- =SlovenianProcessor= :: Handles Slovenian-specific tokenization, normalization, and lemmatization
-- =GenericProcessor= :: Basic processor for space-separated languages without lemmatization
-- =BaseLanguageProcessor= :: Base class that handles basic tokenization without lemmatization for any other language
+** Current Language Support
+- =GenericProcessor= :: Basic processor for space-separated languages without lemmatization (always available)
+- Downloadable processors: Available as separate plugins (install with =blitzer languages install [lang-code]=)
 
 * Technical Architecture
 
@@ -161,11 +150,11 @@ The tool looks for these databases but does not create them automatically. When 
 - =cli.py= :: Command-line interface using Click
 - =config.py= :: XDG configuration management
 - =processor.py= :: Core text processing logic
-- =languages/= :: Language-specific processing modules
+- =data_manager.py= :: Language data management utilities
 
 ** Processing Pipeline
 1. Read text from stdin or from text argument
-2. Load appropriate language processor via dynamic import and get_processor function
+2. Load appropriate language specification via entry points and register function
 3. Apply text normalization (if language-specific)
 4. Tokenize text into words or lemmatize as needed
 5. Apply exclusion filtering
