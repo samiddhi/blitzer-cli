@@ -17,30 +17,22 @@ class TestConfig:
         assert isinstance(config_dir, Path)
         # Should end with 'blitzer'
         assert config_dir.name == 'blitzer'
+        # The important thing is that config isolation is working through fixtures
     
-    def test_load_config_creates_default(self):
+    def test_load_config_creates_default(self, mock_config_dir):
         """Test that loading config creates a default if it doesn't exist."""
-        # Temporarily change the config directory for testing
-        with tempfile.TemporaryDirectory() as temp_dir:
-            original_home = Path.home()
-            # Create a mock home directory structure
-            mock_home = Path(temp_dir) / 'home'
-            mock_config_dir = mock_home / '.config' / 'blitzer'
-            mock_config_dir.mkdir(parents=True)
-            
-            # Since we can't easily override the home directory in the function,
-            # we'll test the behavior by checking the default config creation
-            config = load_config()
-            
-            # Should return a dictionary
-            assert isinstance(config, dict)
-            # Should have default keys
-            assert 'default_lemmatize' in config
-            assert 'default_freq' in config
-            assert 'default_context' in config
-            assert 'default_prompt' in config
-            assert 'default_src' in config
-            assert 'prompts' in config
+        # This should now use our temporary config directory
+        config = load_config()
+        
+        # Should return a dictionary
+        assert isinstance(config, dict)
+        # Should have default keys
+        assert 'default_lemmatize' in config
+        assert 'default_freq' in config
+        assert 'default_context' in config
+        assert 'default_prompt' in config
+        assert 'default_src' in config
+        assert 'prompts' in config
     
     def test_default_config_content(self):
         """Test that default config has expected content."""

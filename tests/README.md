@@ -19,3 +19,6 @@ tox
 ```
 
 ## Python versions supported: 3.8-3.12
+
+## Test Configuration Isolation
+All tests run with isolated configuration directories to ensure consistent results regardless of your personal Blitzer config. Tests use temporary directories instead of ~/.config/blitzer.

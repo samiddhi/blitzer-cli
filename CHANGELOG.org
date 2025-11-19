@@ -18,6 +18,13 @@ All notable changes to the Blitzer CLI project will be documented in this file.
   - Added comprehensive =.gitignore= file including Python cache files, build artifacts, and macOS =.DS_Store= files
   - Enhanced =pyproject.toml= with pytest configuration for better test integration
 
+*** Fixed
+
+- *Test configuration isolation*
+  - Implemented automatic config directory isolation for all tests using pytest fixtures
+  - Tests now use temporary config directories instead of user's actual config
+  - Ensures reliable, consistent test results regardless of user's configuration
+
 *** Changed
 
 - Updated minimum supported Python version from 3.7 to 3.8 to ensure type annotation compatibility
