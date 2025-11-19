@@ -90,19 +90,31 @@ The tool uses XDG specifications for configuration management:
 - Exclusion files: =~/.config/blitzer/[lang_code]_exclusion.txt= (only location looked up)
 
 ** Default Configuration
-When the config file doesn't exist, it will be created with these defaults:
+When the config file doesn't exist, it will be automatically created with these defaults:
 #+BEGIN_SRC toml
 # Blitzer CLI Configuration
 # This file uses TOML format
 
-# Default settings
-default_language = "pli"  # Default language for config purposes only
+# Default flag values
+default_lemmatize = false  # Default value for --lemmatize/-L flag
+default_freq = false       # Default value for --freq/-f flag
+default_context = false    # Default value for --context/-c flag
+default_prompt = false     # Default value for --prompt/-p flag
+default_src = false        # Default value for --src/-s flag
 
-# Output settings
-include_frequency = false  # Whether to include frequency by default
+# Language-specific prompts
+# Each key in the prompts table represents a language code with its custom prompt
+[prompts]
+"base" = "Convert the following wordlist into tab separated anki cards."
+"en" = "Convert the following wordlist into tab separated anki cards."
+
+# Other language examples:
+# "es" = "Extrae el vocabulario del siguiente texto en español..."
+# "fr" = "Extrayez le vocabulaire du texte suivant en français..."
+
 #+END_SRC
 
-Note: The language flag is now required, so the default_language in the config is only for configuration reference.
+Configuration defaults can be overridden with negative flags: =--no-lemmatize=, =--no-freq=, =--no-context=, =--no-prompt=, =--no-src=.
 
 ** Exclusion Lists
 Exclusion lists prevent known words from appearing in output. Language-specific exclusion lists are automatically created in the config directory when first accessing a language.

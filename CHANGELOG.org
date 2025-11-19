@@ -2,6 +2,32 @@
 
 All notable changes to the Blitzer CLI project will be documented in this file.
 
+** [0.0.5] - 2025-11-19
+
+*** Added
+
+- *Enhanced configuration system*
+  - Added configurable defaults for all boolean flags: =default_lemmatize=, =default_freq=, =default_context=, =default_prompt=, =default_src=
+  - Added default language prompts for =base= and =en= languages
+  - Implemented automatic config file creation with comprehensive defaults when none exists
+  - Added dual flag system (--flag/--no-flag) allowing users to override configuration defaults
+  - Added support for multi-line prompts in config using TOML multi-line string syntax
+
+*** Changed
+
+- *Refactored CLI flag system*
+  - Updated all boolean flags to use --flag/--no-flag pattern for proper default override behavior
+  - Removed the unused =default_language= configuration option from config file
+  - Made language code required again since default was not properly used in workflow
+  - Enhanced config loading to create default config when file doesn't exist
+  - Updated default prompts to focus on Anki card generation: "Convert the following wordlist into tab separated anki cards."
+
+*** Fixed
+
+- Fixed CLI flag precedence system to properly allow config defaults to be overridden
+- Corrected configuration file example to only include actually configurable options
+- Removed obsolete code that was attempting to handle default language from config when language is required
+
 ** [0.0.4] - 2025-11-18
 
 *** Added
