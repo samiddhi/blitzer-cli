@@ -53,7 +53,7 @@ def ensure_language_data(language_code: str, filename: str, url: Optional[str] =
         try:
             return download_language_data(url, language_code, filename)
         except Exception as e:
-            print(f"Failed to download language data: {e}")
+            print(f"\033[31mFailed to download language data: {e}\033[0m", file=sys.stderr)
             return None
     
     return None

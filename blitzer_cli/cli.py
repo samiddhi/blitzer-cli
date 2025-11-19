@@ -44,7 +44,7 @@ def blitz(text, language_code, lemmatize, freq, context, prompt, src):
     input_text = text.strip() if text else sys.stdin.read().strip()
 
     if not input_text:
-        click.echo("No input text provided.", err=True)
+        print("\033[31mNo input text provided.\033[0m", file=sys.stderr)
         raise click.Abort()
 
     # Process the text
@@ -63,7 +63,7 @@ def blitz(text, language_code, lemmatize, freq, context, prompt, src):
         print(output, end="")
 
     except Exception as e:
-        print(f"Error processing text: {e}", file=sys.stderr)
+        print(f"\033[31mError processing text: {e}\033[0m", file=sys.stderr)
         sys.exit(1)
 
 
@@ -76,7 +76,7 @@ def manage_languages(action, language_code):
             click.echo(lang)
     elif action == 'install':
         if not language_code:
-            click.echo("Please specify a language code to install.", err=True)
+            print("\033[31mPlease specify a language code to install.\033[0m", file=sys.stderr)
             raise click.Abort()
         
         package_name = f"blitzer-language-{language_code}"
@@ -88,12 +88,12 @@ def manage_languages(action, language_code):
             click.echo(f"Successfully installed {package_name}")
             click.echo(result.stdout)
         except subprocess.CalledProcessError as e:
-            click.echo(f"Failed to install {package_name}: {e}")
-            click.echo(e.stderr)
+            print(f"\033[31mFailed to install {package_name}: {e}\033[0m", file=sys.stderr)
+            print(f"\033[31m{e.stderr}\033[0m", file=sys.stderr)
             sys.exit(1)
     elif action == 'uninstall':
         if not language_code:
-            click.echo("Please specify a language code to uninstall.", err=True)
+            print("\033[31mPlease specify a language code to uninstall.\033[0m", file=sys.stderr)
             raise click.Abort()
         
         package_name = f"blitzer-language-{language_code}"
@@ -105,8 +105,8 @@ def manage_languages(action, language_code):
             click.echo(f"Successfully uninstalled {package_name}")
             click.echo(result.stdout)
         except subprocess.CalledProcessError as e:
-            click.echo(f"Failed to uninstall {package_name}: {e}")
-            click.echo(e.stderr)
+            print(f"\033[31mFailed to uninstall {package_name}: {e}\033[0m", file=sys.stderr)
+            print(f"\033[31m{e.stderr}\033[0m", file=sys.stderr)
             sys.exit(1)
 
 

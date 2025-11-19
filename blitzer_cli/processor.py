@@ -37,7 +37,7 @@ def process_text(
     if prompt_flag:
         prompt_text = get_language_prompt(language_code)
         if not prompt_text:
-            print("WARNING: No language-specific prompt configured for this language. Ignoring --prompt flag.", file=sys.stderr)
+            print("\033[31mWARNING: No language-specific prompt configured for this language. Ignoring --prompt flag.\033[0m", file=sys.stderr)
             prompt_flag = False
     
     # 1. Normalization
@@ -56,7 +56,7 @@ def process_text(
     processed_tokens = []
     if lemmatize_flag and language_code in ['base', 'generic']:
         # If using base/generic language with lemmatize flag, issue warning and continue with original tokens
-        print(f"WARNING: Base/generic mode has no lemmatization. Proceeding without lemmatization.", file=sys.stderr)
+        print(f"\033[31mWARNING: Base/generic mode has no lemmatization. Proceeding without lemmatization.\033[0m", file=sys.stderr)
         processed_tokens = tokens
     elif lemmatize_flag and language_spec.get("custom_lemmatizer"):
         # Use custom lemmatizer if provided
@@ -66,7 +66,7 @@ def process_text(
         processed_tokens = sql_lemmatize_tokens(tokens, language_spec["db_path"])
     elif lemmatize_flag:
         # If lemmatize flag is set but no lemmatizer available, issue warning and continue with original tokens
-        print(f"WARNING: No lemmatizer available for language {language_code}. Proceeding without lemmatization.", file=sys.stderr)
+        print(f"\033[31mWARNING: No lemmatizer available for language {language_code}. Proceeding without lemmatization.\033[0m", file=sys.stderr)
         processed_tokens = tokens
     else:
         # No lemmatization, keep original tokens
