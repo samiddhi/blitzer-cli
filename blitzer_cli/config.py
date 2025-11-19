@@ -69,10 +69,6 @@ default_src = false        # Default value for --src/-s flag
 "base" = "Convert the following wordlist into tab separated anki cards."
 "en" = "Convert the following wordlist into tab separated anki cards."
 
-# Other language examples:
-# "es" = "Extrae el vocabulario del siguiente texto en español..."
-# "fr" = "Extrayez le vocabulaire du texte suivant en français..."
-
 """
     
     with open(config_file, 'w', encoding='utf-8') as f:
