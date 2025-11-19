@@ -12,7 +12,7 @@ from pathlib import Path
 _db_cache = {}
 
 
-def regex_tokenize(text: str) -> list[str]:
+def regex_tokenize(text: str) -> List[str]:
     """Core fallback tokenizer using the regex library."""
     import regex
     # Pattern that works for 95% of languages: letters with optional diacritics/numbers/apostrophes/hyphens

@@ -1,0 +1,4 @@
+# Test requirements for Blitzer CLI
+pytest>=7.0.0
+pytest-cov>=4.0.0
+requests-mock>=1.9.0  # For mocking HTTP requests in tests

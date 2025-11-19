@@ -1,4 +1,4 @@
+blitzer-venv
 blitzer_cli
-blitzer_language_slv
-example_plugins
-test_slv_plugin
+plugins
+tests

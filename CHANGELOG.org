@@ -2,6 +2,36 @@
 
 All notable changes to the Blitzer CLI project will be documented in this file.
 
+** [0.0.6] - 2025-11-19
+
+*** Added
+
+- *Comprehensive test suite*
+  - Added complete test suite with tests for all modules and functionality
+  - Included specific tests for error message coloring and edge cases
+  - Added test runner with single entry point: =python tests/run_tests.py=
+  - Added support for testing across multiple Python versions (3.8-3.12)
+  - Added GitHub Actions workflow and tox configuration for CI/CD
+  - Added coverage reporting support
+
+- *Project infrastructure*
+  - Added comprehensive =.gitignore= file including Python cache files, build artifacts, and macOS =.DS_Store= files
+  - Enhanced =pyproject.toml= with pytest configuration for better test integration
+
+*** Changed
+
+- Updated minimum supported Python version from 3.7 to 3.8 to ensure type annotation compatibility
+  - This maintains compatibility with the Python versions used in CI/CD workflows
+
+*** Fixed
+
+- Added red coloring to all error and warning messages
+  - All error messages now properly display in red and are sent to stderr
+
+*** Removed
+
+- Removed legacy =old_processor.py= file that was no longer used by the application
+
 ** [0.0.5] - 2025-11-19
 
 *** Added
