@@ -36,8 +36,19 @@ def load_config():
         with open(config_file, 'rb') as f:
             return tomllib.load(f)
     except Exception:
-        # Return empty config if loading fails
-        return {}
+        # If config doesn't exist or fails to load, create default and reload
+        if not config_file.exists():
+            create_default_config(config_file)
+            # Now load the newly created config
+            try:
+                with open(config_file, 'rb') as f:
+                    return tomllib.load(f)
+            except Exception:
+                # If it still fails after creating default, return empty config
+                return {}
+        else:
+            # If file exists but loading failed for other reasons, return empty config
+            return {}
 
 
 def create_default_config(config_file):
@@ -45,12 +56,23 @@ def create_default_config(config_file):
     default_config = """# Blitzer CLI Configuration
 # This file uses TOML format
 
-# Default settings
-default_language = "base"  # Default language code ('generic' is equivalent but 'base' is preferred)
-default_mode = "word_list"  # Default processing mode
+# Default flag values
+default_lemmatize = false  # Default value for --lemmatize/-L flag
+default_freq = false       # Default value for --freq/-f flag
+default_context = false    # Default value for --context/-c flag
+default_prompt = false     # Default value for --prompt/-p flag
+default_src = false        # Default value for --src/-s flag
 
-# Output settings
-include_frequency = false  # Whether to include frequency by default
+# Language-specific prompts
+# Each key in the prompts table represents a language code with its custom prompt
+[prompts]
+"base" = "Convert the following wordlist into tab separated anki cards."
+"en" = "Convert the following wordlist into tab separated anki cards."
+
+# Other language examples:
+# "es" = "Extrae el vocabulario del siguiente texto en español..."
+# "fr" = "Extrayez le vocabulaire du texte suivant en français..."
+
 """
     
     with open(config_file, 'w', encoding='utf-8') as f:

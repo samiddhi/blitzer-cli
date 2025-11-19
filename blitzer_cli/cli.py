@@ -20,16 +20,26 @@ def cli():
 @cli.command("blitz", help="Return wordlist from text.")
 @click.option("--text", "-t", help="Direct text input (overrides stdin).")
 @click.option("--language_code", "-l", required=True, help="ISO 639 three-character language code or \"base\"/\"generic\" for simple processing.")
-@click.option("--lemmatize", "-L", is_flag=True, help="Treats different declensions/forms of the same word as one word.")
-@click.option("--freq", "-f", is_flag=True, help="Includes word frequency count in output.")
-@click.option("--context", "-c", is_flag=True, help="Includes sample context for each word in output.")
-@click.option("--prompt", "-p", is_flag=True, help="Includes custom prompt for LLM at the top of output.",)
-@click.option("--src", "-s", is_flag=True, help="Includes the full source text at the top of output.")
+@click.option("--lemmatize/--no-lemmatize", "-L", default=None, help="Treats different declensions/forms of the same word as one word.")
+@click.option("--freq/--no-freq", "-f", default=None, help="Includes word frequency count in output.")
+@click.option("--context/--no-context", "-c", default=None, help="Includes sample context for each word in output.")
+@click.option("--prompt/--no-prompt", "-p", default=None, help="Includes custom prompt for LLM at the top of output.",)
+@click.option("--src/--no-src", "-s", default=None, help="Includes the full source text at the top of output.")
 def blitz(text, language_code, lemmatize, freq, context, prompt, src):
-    # Language code must be provided
-    if language_code is None:
-        click.echo("Language code is required. Use -l or --language_code to specify a language.", err=True)
-        raise click.Abort()
+    # Load config to use defaults for flags
+    config = load_config()
+    
+    # Use config defaults if CLI flags weren't explicitly set
+    if lemmatize is None:
+        lemmatize = config.get('default_lemmatize', False)
+    if freq is None:
+        freq = config.get('default_freq', False)
+    if context is None:
+        context = config.get('default_context', False)
+    if prompt is None:
+        prompt = config.get('default_prompt', False)
+    if src is None:
+        src = config.get('default_src', False)
 
     input_text = text.strip() if text else sys.stdin.read().strip()
 
