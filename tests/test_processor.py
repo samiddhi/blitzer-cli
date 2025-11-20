@@ -50,9 +50,9 @@ class TestProcessor:
         process_text(text, "base", lemmatize_flag=True, freq_flag=False, context_flag=False)
         
         captured = capfd.readouterr()
-        # Check that error message is in stderr and is red-colored
-        assert 'Base/generic mode has no lemmatization' in captured.err
-        assert '\033[31m' in captured.err  # Red color code
+        # Check that error message is in stderr and is yellow-colored (warning)
+        assert 'Base mode has no lemmatization' in captured.err
+        assert '\033[33m' in captured.err  # Yellow color code for warning
         assert '\033[0m' in captured.err  # Reset color code
     
     def test_language_spec_base(self):

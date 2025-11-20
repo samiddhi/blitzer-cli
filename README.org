@@ -37,7 +37,7 @@ blitzer blitz -t "Your text here" -l [language_code] [flags]
 #+END_SRC
 
 ** Available Languages
-- =base= :: Basic processor for space-separated languages (no lemmatization support); 'generic' is equivalent but not listed separately
+- =base= :: Basic processor for space-separated languages (no lemmatization support)
 - Downloadable language packs available via plugins (e.g., =blitzer languages install pli= for Pali, =blitzer languages install slv= for Slovenian)
 
 ** Available Commands
@@ -149,7 +149,7 @@ The tool supports language-specific dictionaries that enable lemmatization when 
 The tool looks for these databases in the installed plugins but does not create them automatically. When a language dictionary is not available, the tool falls back to basic word processing without lemmatization capabilities.
 
 ** Current Language Support
-- =base= :: Basic processor for space-separated languages without lemmatization (always available); 'generic' is equivalent but not listed separately
+- =base= :: Basic processor for space-separated languages without lemmatization (always available)
 - Downloadable processors: Available as separate plugins (install with =blitzer languages install [lang-code]=)
 
 * Technical Architecture

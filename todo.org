@@ -2,9 +2,6 @@
 ** High Priority
 
 ** Low Priority
-- [ ] Create a test suite
-  - [ ] Edge cases, error messages, etc.
-  - [ ] Method to test different python versions. Not sure what the standard is for how old we should support.
-- [ ] get_language_name method or just the processor.name
-
+- [ ] vibe code assessment
+    
 ** Questions

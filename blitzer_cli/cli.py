@@ -4,11 +4,14 @@ Minimalist CLI tool for language text processing.
 Accepts text via stdin and outputs word lists via stdout.
 """
 
+import re
 import sys
 import subprocess
 import click
+from typing import Optional
 from blitzer_cli.processor import process_text, get_available_languages
 from blitzer_cli.config import load_config
+from blitzer_cli.utils import print_error, print_warning
 
 
 @click.group(invoke_without_command=False)
@@ -19,7 +22,7 @@ def cli():
 
 @cli.command("blitz", help="Return wordlist from text.")
 @click.option("--text", "-t", help="Direct text input (overrides stdin).")
-@click.option("--language_code", "-l", required=True, help="ISO 639 three-character language code or \"base\"/\"generic\" for simple processing.")
+@click.option("--language_code", "-l", required=True, help="ISO 639 three-character language code or \"base\" for simple processing.")
 @click.option("--lemmatize/--no-lemmatize", "-L", default=None, help="Treats different declensions/forms of the same word as one word.")
 @click.option("--freq/--no-freq", "-f", default=None, help="Includes word frequency count in output.")
 @click.option("--context/--no-context", "-c", default=None, help="Includes sample context for each word in output.")
@@ -30,21 +33,16 @@ def blitz(text, language_code, lemmatize, freq, context, prompt, src):
     config = load_config()
     
     # Use config defaults if CLI flags weren't explicitly set
-    if lemmatize is None:
-        lemmatize = config.get('default_lemmatize', False)
-    if freq is None:
-        freq = config.get('default_freq', False)
-    if context is None:
-        context = config.get('default_context', False)
-    if prompt is None:
-        prompt = config.get('default_prompt', False)
-    if src is None:
-        src = config.get('default_src', False)
+    lemmatize = lemmatize if lemmatize is not None else config.get('default_lemmatize', False)
+    freq = freq if freq is not None else config.get('default_freq', False)
+    context = context if context is not None else config.get('default_context', False)
+    prompt = prompt if prompt is not None else config.get('default_prompt', False)
+    src = src if src is not None else config.get('default_src', False)
 
     input_text = text.strip() if text else sys.stdin.read().strip()
 
     if not input_text:
-        print("\033[31mNo input text provided.\033[0m", file=sys.stderr)
+        print_error("No input text provided.")
         raise click.Abort()
 
     # Process the text
@@ -63,8 +61,16 @@ def blitz(text, language_code, lemmatize, freq, context, prompt, src):
         print(output, end="")
 
     except Exception as e:
-        print(f"\033[31mError processing text: {e}\033[0m", file=sys.stderr)
+        print_error(f"Error processing text: {e}")
         sys.exit(1)
+
+
+def validate_language_code(language_code: str) -> bool:
+    """Validate language code format to prevent injection."""
+    if not language_code:
+        return False
+    # Require 3-letter ISO 639 language codes
+    return bool(re.match(r'^[a-z]{3}$', language_code))
 
 
 @cli.command("languages", help="Manage language packs.")
@@ -74,9 +80,14 @@ def manage_languages(action, language_code):
     if action == 'list':
         for lang in get_available_languages():
             click.echo(lang)
-    elif action == 'install':
+    elif action in ['install', 'uninstall']:
         if not language_code:
-            print("\033[31mPlease specify a language code to install.\033[0m", file=sys.stderr)
+            print_error("Please specify a language code to install.")
+            raise click.Abort()
+        
+        # Validate the language code to prevent injection
+        if not validate_language_code(language_code):
+            print_error(f"Invalid language code format: {language_code}. Use 2-3 lowercase letters.")
             raise click.Abort()
         
         package_name = f"blitzer-language-{language_code}"
@@ -88,12 +99,17 @@ def manage_languages(action, language_code):
             click.echo(f"Successfully installed {package_name}")
             click.echo(result.stdout)
         except subprocess.CalledProcessError as e:
-            print(f"\033[31mFailed to install {package_name}: {e}\033[0m", file=sys.stderr)
-            print(f"\033[31m{e.stderr}\033[0m", file=sys.stderr)
+            print_error(f"Failed to install {package_name}: {e}")
+            print_error(e.stderr)
             sys.exit(1)
     elif action == 'uninstall':
         if not language_code:
-            print("\033[31mPlease specify a language code to uninstall.\033[0m", file=sys.stderr)
+            print_error("Please specify a language code to uninstall.")
+            raise click.Abort()
+        
+        # Validate the language code to prevent injection
+        if not validate_language_code(language_code):
+            print_error(f"Invalid language code format: {language_code}. Use 2-3 lowercase letters.")
             raise click.Abort()
         
         package_name = f"blitzer-language-{language_code}"
@@ -105,8 +121,8 @@ def manage_languages(action, language_code):
             click.echo(f"Successfully uninstalled {package_name}")
             click.echo(result.stdout)
         except subprocess.CalledProcessError as e:
-            print(f"\033[31mFailed to uninstall {package_name}: {e}\033[0m", file=sys.stderr)
-            print(f"\033[31m{e.stderr}\033[0m", file=sys.stderr)
+            print_error(f"Failed to uninstall {package_name}: {e}")
+            print_error(e.stderr)
             sys.exit(1)
 
 

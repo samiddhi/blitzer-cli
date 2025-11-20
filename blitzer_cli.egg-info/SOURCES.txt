@@ -4,6 +4,7 @@ blitzer_cli/cli.py
 blitzer_cli/config.py
 blitzer_cli/data_manager.py
 blitzer_cli/processor.py
+blitzer_cli/utils.py
 blitzer_cli.egg-info/PKG-INFO
 blitzer_cli.egg-info/SOURCES.txt
 blitzer_cli.egg-info/dependency_links.txt

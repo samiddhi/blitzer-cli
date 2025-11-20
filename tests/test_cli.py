@@ -36,12 +36,12 @@ class TestCLI:
         
         assert result.exit_code == 0
         # Check that warning appears in output
-        assert 'Base/generic mode has no lemmatization' in result.output or result.stderr_bytes is not None
+        assert 'Base mode has no lemmatization' in result.output or result.stderr_bytes is not None
         # Since we modified the output to go to stderr, we should check stderr
         if result.stderr_bytes:
             stderr_output = result.stderr_bytes.decode('utf-8')
-            assert 'Base/generic mode has no lemmatization' in stderr_output
-            assert '\033[31m' in stderr_output  # Red color code
+            assert 'Base mode has no lemmatization' in stderr_output
+            assert '\033[33m' in stderr_output  # Yellow color code for warning
     
     def test_blitz_command_missing_language(self):
         """Test blitz command with missing language flag."""

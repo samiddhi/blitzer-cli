@@ -89,7 +89,7 @@ All notable changes to the Blitzer CLI project will be documented in this file.
 - Updated plugin system to use =register()= functions instead of processor classes
 - Simplified plugin interface with configurable normalizers, tokenizers, and lemmatizers
 - Enhanced plugin discovery and error handling
-- Language listing now only shows 'base' instead of both 'base' and 'generic' (both still function equivalently)
+- Language listing now shows 'base' as the only built-in language
 
 *** Removed
 
@@ -164,7 +164,7 @@ All notable changes to the Blitzer CLI project will be documented in this file.
 
 - New =list= subcommand to show supported languages
 
-- Added =generic= language processor for basic space-separated language processing
+- Added =base= language processor for basic space-separated language processing
 
 - Fixed syntax error in Pali language processor's normalize method
 

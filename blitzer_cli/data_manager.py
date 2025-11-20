@@ -5,6 +5,7 @@ from pathlib import Path
 import requests
 from typing import Optional
 from blitzer_cli.config import get_config_dir
+from blitzer_cli.utils import print_error, print_warning
 
 
 def get_language_data_dir(language_code: str) -> Path:
@@ -53,7 +54,27 @@ def ensure_language_data(language_code: str, filename: str, url: Optional[str] =
         try:
             return download_language_data(url, language_code, filename)
         except Exception as e:
-            print(f"\033[31mFailed to download language data: {e}\033[0m", file=sys.stderr)
+            print_error(f"Failed to download language data: {e}")
             return None
     
     return None
+
+
+def cleanup_language_data(language_code: Optional[str] = None) -> None:
+    """Clean up language data files, either for a specific language or all languages."""
+    config_dir = get_config_dir()
+    data_dir = config_dir / "language_data"
+    
+    if not data_dir.exists():
+        return  # Nothing to clean up
+    
+    if language_code:
+        # Clean up data for specific language
+        lang_data_dir = data_dir / language_code
+        if lang_data_dir.exists():
+            import shutil
+            shutil.rmtree(lang_data_dir)
+    else:
+        # Clean up all language data
+        import shutil
+        shutil.rmtree(data_dir)

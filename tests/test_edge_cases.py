@@ -77,8 +77,8 @@ class TestErrorMessageColoring:
         result = runner.invoke(cli, ['blitz', '-l', 'base', '-t', 'test', '--lemmatize'])
         if result.stderr_bytes:
             stderr_output = result.stderr_bytes.decode('utf-8')
-            if 'Base/generic mode has no lemmatization' in stderr_output:
-                assert '\033[31m' in stderr_output  # Red color code
+            if 'Base mode has no lemmatization' in stderr_output:
+                assert '\033[33m' in stderr_output  # Yellow color code for warning
                 assert '\033[0m' in stderr_output  # Reset color code
         
         # Clear captured output

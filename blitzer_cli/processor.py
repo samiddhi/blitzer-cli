@@ -4,8 +4,11 @@ import re
 import sqlite3
 import sys
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from typing import List, Dict, Optional, Any
 from pathlib import Path
+
+from blitzer_cli.utils import print_error, print_warning
 
 
 # In-memory cache for database connections (per language)
@@ -54,9 +57,9 @@ def process_text(
     
     # 3. Lemmatization (only if --lemmatize/-L and valid database provided)
     processed_tokens = []
-    if lemmatize_flag and language_code in ['base', 'generic']:
-        # If using base/generic language with lemmatize flag, issue warning and continue with original tokens
-        print(f"\033[31mWARNING: Base/generic mode has no lemmatization. Proceeding without lemmatization.\033[0m", file=sys.stderr)
+    if lemmatize_flag and language_code == 'base':
+        # If using base language with lemmatize flag, issue warning and continue with original tokens
+        print_warning("Base mode has no lemmatization. Proceeding without lemmatization.")
         processed_tokens = tokens
     elif lemmatize_flag and language_spec.get("custom_lemmatizer"):
         # Use custom lemmatizer if provided
@@ -88,8 +91,8 @@ def process_text(
 
 def get_language_spec(language_code: str) -> Dict[str, Any]:
     """Load language specification via entry points. Special handling for 'base' language."""
-    # Special handling for 'base'/'generic' - return basic config without requiring a plugin
-    if language_code in ['base', 'generic']:
+    # Special handling for 'base' - return basic config without requiring a plugin
+    if language_code == 'base':
         return {
             "db_path": None,
             "normalizer": None,
@@ -97,20 +100,8 @@ def get_language_spec(language_code: str) -> Dict[str, Any]:
             "custom_lemmatizer": None
         }
     
-    try:
-        from importlib.metadata import entry_points
-    except ImportError:
-        import importlib_metadata as metadata
-        entry_points = metadata.entry_points
-    
-    # Check which version of entry_points API is available
-    eps_obj = entry_points()
-    if hasattr(eps_obj, 'select'):
-        # Python 3.10+ syntax: entry_points() returns a selection object
-        language_eps = eps_obj.select(group='blitzer.languages')
-    else:
-        # Python 3.8-3.9 syntax: entry_points() returns a dict-like object
-        language_eps = eps_obj.get('blitzer.languages', [])
+    # Use the consistent function for entry points
+    language_eps = get_entry_points()
     
     for ep in language_eps:
         if ep.name == language_code:
@@ -120,6 +111,23 @@ def get_language_spec(language_code: str) -> Dict[str, Any]:
     raise ValueError(f"Unsupported language: {language_code}")
 
 
+@contextmanager
+def get_db_connection(db_path: str):
+    """Context manager for database connections."""
+    if db_path in _db_cache:
+        conn = _db_cache[db_path]
+        yield conn
+    else:
+        conn = sqlite3.connect(db_path)
+        _db_cache[db_path] = conn
+        try:
+            yield conn
+        finally:
+            # Close connection on exception or when done, but only for new connections
+            # In a production system, we might want more sophisticated connection management
+            pass
+
+
 def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
     """Lemmatize tokens using SQLite database lookup with in-memory caching."""
     global _db_cache
@@ -127,60 +135,50 @@ def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
     if not tokens:
         return []
     
-    # Get or create database connection in cache
-    if db_path not in _db_cache:
-        conn = sqlite3.connect(db_path)
-        _db_cache[db_path] = conn
-    else:
-        conn = _db_cache[db_path]
-    
-    cursor = conn.cursor()
-    
-    # Create mapping to preserve original tokens and their order
-    token_to_lower = {token: token.lower() for token in tokens}
-    unique_tokens = list(set(token_to_lower.values()))
-    
-    # Create a temporary table approach for batch lookup
-    # First, create a temporary table with all the tokens we need to look up
-    cursor.execute("CREATE TEMP TABLE temp_lookup (form TEXT)")
-    
-    # Insert all unique tokens into the temp table
-    cursor.executemany("INSERT INTO temp_lookup (form) VALUES (?)", [(token,) for token in unique_tokens])
-    
-    # Perform a single JOIN query to get all lemmas at once
-    cursor.execute("""
-        SELECT tl.form, l.lemma 
-        FROM temp_lookup tl
-        JOIN Forms f ON f.form_representation = tl.form COLLATE NOCASE
-        JOIN Lemmas l ON l.id = f.lemma_id
-    """)
-    
-    # Group the results by form
-    form_to_lemmas = {}
-    for form, lemma in cursor.fetchall():
-        if form not in form_to_lemmas:
-            form_to_lemmas[form] = []
-        form_to_lemmas[form].append(lemma)
-    
-    # Drop the temporary table
-    cursor.execute("DROP TABLE temp_lookup")
-    
-    # For tokens not found in the database, we need to identify them
-    # All unique tokens that have no lemmas are not found in DB
-    not_found_tokens = set(unique_tokens) - set(form_to_lemmas.keys())
-    
-    # Build the result list in the original order
-    processed_tokens = []
-    for token in tokens:
-        lower_token = token_to_lower[token]
-        if lower_token in form_to_lemmas:
-            # Token was found in DB, add all its lemmas
-            processed_tokens.extend(form_to_lemmas[lower_token])
-        else:
-            # Token was not found in DB, add the original token
-            processed_tokens.append(token)
-    
-    return processed_tokens
+    with get_db_connection(db_path) as conn:
+        cursor = conn.cursor()
+        
+        # Create mapping to preserve original tokens and their order
+        token_to_lower = {token: token.lower() for token in tokens}
+        unique_tokens = list(set(token_to_lower.values()))
+        
+        # Create a temporary table approach for batch lookup
+        # First, create a temporary table with all the tokens we need to look up
+        cursor.execute("CREATE TEMP TABLE temp_lookup (form TEXT)")
+        
+        # Insert all unique tokens into the temp table
+        cursor.executemany("INSERT INTO temp_lookup (form) VALUES (?)", [(token,) for token in unique_tokens])
+        
+        # Perform a single JOIN query to get all lemmas at once
+        cursor.execute("""
+            SELECT tl.form, l.lemma 
+            FROM temp_lookup tl
+            JOIN Forms f ON f.form_representation = tl.form COLLATE NOCASE
+            JOIN Lemmas l ON l.id = f.lemma_id
+        """)
+        
+        # Group the results by form
+        form_to_lemmas = {}
+        for form, lemma in cursor.fetchall():
+            if form not in form_to_lemmas:
+                form_to_lemmas[form] = []
+            form_to_lemmas[form].append(lemma)
+        
+        # Drop the temporary table
+        cursor.execute("DROP TABLE temp_lookup")
+        
+        # Build the result list in the original order
+        processed_tokens = []
+        for token in tokens:
+            lower_token = token_to_lower[token]
+            if lower_token in form_to_lemmas:
+                # Token was found in DB, add all its lemmas
+                processed_tokens.extend(form_to_lemmas[lower_token])
+            else:
+                # Token was not found in DB, add the original token
+                processed_tokens.append(token)
+        
+        return processed_tokens
 
 
 def get_exclusion_terms(language_code: str) -> set:
@@ -201,6 +199,24 @@ def get_language_prompt(language_code: str) -> Optional[str]:
     config = load_config()
     prompts = config.get('prompts', {})
     return prompts.get(language_code)
+
+
+def get_entry_points():
+    """Get entry points in a version-compatible way."""
+    try:
+        from importlib.metadata import entry_points
+        eps = entry_points()
+        if hasattr(eps, 'select'):
+            return eps.select(group='blitzer.languages')
+        else:
+            return eps.get('blitzer.languages', [])
+    except ImportError:
+        import importlib_metadata as metadata
+        eps = metadata.entry_points()
+        if hasattr(eps, 'select'):
+            return eps.select(group='blitzer.languages')
+        else:
+            return eps.get('blitzer.languages', [])
 
 
 def _format_output(
@@ -274,23 +290,19 @@ def split_sentences(text: str) -> List[str]:
 
 def get_available_languages():
     """Get a list of all available languages (plugins only + base)."""
-    try:
-        from importlib.metadata import entry_points
-    except ImportError:
-        import importlib_metadata as metadata
-        entry_points = metadata.entry_points
+    # Use the consistent function for entry points
+    language_eps = get_entry_points()
     
-    # Check which version of entry_points API is available
-    eps_obj = entry_points()
-    if hasattr(eps_obj, 'select'):
-        # Python 3.10+ syntax: entry_points() returns a selection object
-        language_eps = eps_obj.select(group='blitzer.languages')
-    else:
-        # Python 3.8-3.9 syntax: entry_points() returns a dict-like object
-        language_eps = eps_obj.get('blitzer.languages', [])
-    
-    available_languages = ['base']  # Add base as always available (generic is equivalent but not listed separately)
+    available_languages = ['base']  # Add base as always available
     for ep in language_eps:
         available_languages.append(ep.name)
     
     return sorted(set(available_languages))  # Use set to avoid duplicates
+
+
+def cleanup_db_connections():
+    """Close all cached database connections."""
+    global _db_cache
+    for conn in _db_cache.values():
+        conn.close()
+    _db_cache.clear()

@@ -10,6 +10,8 @@ try:
 except ImportError:
     import tomli as tomllib  # Python < 3.11
 
+from blitzer_cli.utils import print_error
+
 
 def get_config_dir():
     """Get the XDG config directory for blitzer."""
