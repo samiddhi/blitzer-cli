@@ -1,11 +1,11 @@
 """Main blitzer-cli package"""
-__version__ = "0.0.6"
+__version__ = "0.1.0"
 
 
 def cleanup_resources():
     """Cleanup all resources used by the blitzer-cli package."""
     from blitzer_cli.processor import cleanup_db_connections
-    from blitzer_cli.data_manager import cleanup_language_data
+    # from blitzer_cli.data_manager import cleanup_language_data
     
     cleanup_db_connections()
     # Optionally clean up language data as well, though user might want to keep it

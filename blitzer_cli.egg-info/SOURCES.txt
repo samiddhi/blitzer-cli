@@ -1,3 +1,5 @@
+MANIFEST.in
+README.md
 pyproject.toml
 blitzer_cli/__init__.py
 blitzer_cli/cli.py
@@ -11,15 +13,3 @@ blitzer_cli.egg-info/dependency_links.txt
 blitzer_cli.egg-info/entry_points.txt
 blitzer_cli.egg-info/requires.txt
 blitzer_cli.egg-info/top_level.txt
-plugins/blitzer_language_pali/blitzer_language_pali/__init__.py
-plugins/blitzer_language_pali/build/lib/blitzer_language_pali/__init__.py
-plugins/blitzer_language_slovenian/blitzer_language_slovenian/__init__.py
-plugins/blitzer_language_slovenian/build/lib/blitzer_language_slovenian/__init__.py
-tests/__init__.py
-tests/conftest.py
-tests/run_tests.py
-tests/test_cli.py
-tests/test_config.py
-tests/test_data_manager.py
-tests/test_edge_cases.py
-tests/test_processor.py

@@ -1,7 +1,6 @@
 """Configuration management using XDG specifications."""
 
 import os
-import sys
 from pathlib import Path
 
 # Import TOML library with fallback for older Python versions
@@ -9,8 +8,6 @@ try:
     import tomllib  # Python 3.11+
 except ImportError:
     import tomli as tomllib  # Python < 3.11
-
-from blitzer_cli.utils import print_error
 
 
 def get_config_dir():

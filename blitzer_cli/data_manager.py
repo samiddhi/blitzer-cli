@@ -1,11 +1,10 @@
 """Data management utilities for language packs."""
 
-import os
 from pathlib import Path
 import requests
 from typing import Optional
 from blitzer_cli.config import get_config_dir
-from blitzer_cli.utils import print_error, print_warning
+from blitzer_cli.utils import print_error
 
 
 def get_language_data_dir(language_code: str) -> Path:

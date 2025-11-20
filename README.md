@@ -1,17 +1,3 @@
-Metadata-Version: 2.1
-Name: blitzer-cli
-Version: 0.1.0
-Summary: A minimalist CLI tool for language text processing
-Author: Blitzer Team
-License: MIT
-Requires-Python: >=3.8
-Description-Content-Type: text/markdown
-Requires-Dist: click
-Requires-Dist: importlib-metadata; python_version < "3.8"
-Requires-Dist: requests
-Requires-Dist: tomli; python_version < "3.11"
-Requires-Dist: regex
-
 # Blitzer CLI
 ## A minimalist command-line tool for language text processing
 

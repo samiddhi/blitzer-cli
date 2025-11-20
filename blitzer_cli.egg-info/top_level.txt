@@ -1,5 +1,1 @@
-blitzer-venv
 blitzer_cli
-coverage_report
-plugins
-tests

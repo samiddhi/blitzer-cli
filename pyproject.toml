@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blitzer-cli"
-version = "0.0.6"
+version = "0.1.0"
 description = "A minimalist CLI tool for language text processing"
 authors = [{name = "Blitzer Team"}]
 license = {text = "MIT"}
@@ -25,6 +25,10 @@ blitzer = "blitzer_cli.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["blitzer_cli*"]
+
+[tool.setuptools.package-data]
+blitzer_cli = ["*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

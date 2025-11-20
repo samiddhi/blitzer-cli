@@ -1,0 +1,8 @@
+include *.md
+include *.txt
+include *.toml
+recursive-exclude blitzer_cli *.py[cod]
+recursive-exclude tests *
+recursive-exclude plugins *
+global-exclude tests
+global-exclude plugins

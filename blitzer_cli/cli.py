@@ -8,10 +8,9 @@ import re
 import sys
 import subprocess
 import click
-from typing import Optional
 from blitzer_cli.processor import process_text, get_available_languages
 from blitzer_cli.config import load_config
-from blitzer_cli.utils import print_error, print_warning
+from blitzer_cli.utils import print_error
 
 
 @click.group(invoke_without_command=False)
@@ -87,7 +86,7 @@ def manage_languages(action, language_code):
         
         # Validate the language code to prevent injection
         if not validate_language_code(language_code):
-            print_error(f"Invalid language code format: {language_code}. Use 2-3 lowercase letters.")
+            print_error(f"Invalid language code format: {language_code}. Use 3 lowercase letters (ISO 639-3).")
             raise click.Abort()
         
         package_name = f"blitzer-language-{language_code}"
@@ -109,7 +108,7 @@ def manage_languages(action, language_code):
         
         # Validate the language code to prevent injection
         if not validate_language_code(language_code):
-            print_error(f"Invalid language code format: {language_code}. Use 2-3 lowercase letters.")
+            print_error(f"Invalid language code format: {language_code}. Use 3 lowercase letters (ISO 639-3).")
             raise click.Abort()
         
         package_name = f"blitzer-language-{language_code}"

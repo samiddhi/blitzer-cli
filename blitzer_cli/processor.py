@@ -2,13 +2,11 @@
 
 import re
 import sqlite3
-import sys
-from collections import Counter, defaultdict
+from collections import Counter
 from contextlib import contextmanager
 from typing import List, Dict, Optional, Any
-from pathlib import Path
 
-from blitzer_cli.utils import print_error, print_warning
+from blitzer_cli.utils import print_warning
 
 
 # In-memory cache for database connections (per language)
@@ -230,7 +228,6 @@ def _format_output(
     language_code: str
 ) -> str:
     """Format output based on flags."""
-    import sys
     
     result_lines = []
     
