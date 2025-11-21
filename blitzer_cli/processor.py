@@ -30,11 +30,17 @@ _db_cache = {}
 
 
 def regex_tokenize(text: str) -> List[str]:
-    """Core fallback tokenizer using the standard re library."""
+    """Core fallback tokenizer using the standard re library with improved Unicode support."""
     import re
-    # Pattern that works for most languages: letters with optional numbers/apostrophes/hyphens
-    # Using standard re instead of regex library for broader compatibility
-    tokens = re.findall(r"[a-zA-Z]+(?:[a-zA-Z0-9'\-]*[a-zA-Z]+)?", text.lower())
+    # Use a space-based split first, then refine to handle punctuation within words
+    # This approach better preserves international characters
+    words = text.lower().split()
+    tokens = []
+    for word in words:
+        # Extract sequences of letter characters (Unicode-aware)
+        # This handles punctuation and special characters around words
+        extracted = re.findall(r"[a-zA-Z\u00C0-\u017F\u0100-\u024F\u1E00-\u1EFF]+", word)
+        tokens.extend(extracted)
     return tokens
 
 
