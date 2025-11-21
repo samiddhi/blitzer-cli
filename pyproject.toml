@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blitzer-cli"
-version = "0.1.0"
+version = "0.1.1"
 description = "A CLI for language-learning vocabulary extraction"
 authors = [{name = "Samiddhi"}]
 license = {text = "GPL-3.0-or-later"}

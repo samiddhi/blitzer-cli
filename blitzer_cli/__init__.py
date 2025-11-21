@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """Main blitzer-cli package"""
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 def cleanup_resources():
