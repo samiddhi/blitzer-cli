@@ -1,3 +1,19 @@
+# blitzer-cli: A CLI tool
+# Copyright (C) 2025 Samiddhi
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """New core text processing functionality following the specified architecture."""
 
 import re
@@ -14,10 +30,11 @@ _db_cache = {}
 
 
 def regex_tokenize(text: str) -> List[str]:
-    """Core fallback tokenizer using the regex library."""
-    import regex
-    # Pattern that works for 95% of languages: letters with optional diacritics/numbers/apostrophes/hyphens
-    tokens = regex.findall(r"\p{L}+(?:[\p{M}\p{N}'\-]+\p{L}+)*", text.lower())
+    """Core fallback tokenizer using the standard re library."""
+    import re
+    # Pattern that works for most languages: letters with optional numbers/apostrophes/hyphens
+    # Using standard re instead of regex library for broader compatibility
+    tokens = re.findall(r"[a-zA-Z]+(?:[a-zA-Z0-9'\-]*[a-zA-Z]+)?", text.lower())
     return tokens
 
 

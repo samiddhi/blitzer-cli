@@ -5,13 +5,13 @@
 
 ## Overview
 
-Blitzer CLI is a minimalist command-line tool for language text processing that produces a word frequency list from input text. In addition to simple word frequency list, it also can support lemmatization for different languages. In simple terms, lemmatization means that, taking English as an example, the output can optionally treat "running" "ran" and "runs" as three instances of the same word as opposed to three different words.
+Blitzer CLI is a command-line tool for language-learners that produces a word frequency list from input text. In addition to the simple word frequency list, the tool supports "lemmatization" for different languages. In simple terms, this means that, taking English as an example, the output can optionally treat "running" "ran" and "runs" as three instances of the same word as opposed to three different words.
 
-Optionally (but recommended) users can create and include their own word exclusion lists which will exclude words from the result. This essentially means that as vocabulary is acquired to you and added to this list, the output from this tool will be exclusively words you do not already know. The upfront cost of making and maintaining this exclusion list comes with the benefit of instant custom vocabulary for texts you intent to read, listen to, or study, as well as a way to track how many words you know in your language. Pretty cool!
+Users can create and include their own word exclusion lists which will bar words from the result. The upfront cost of making and maintaining this exclusion list comes with the benefit of instant custom vocabulary for texts you intent to read, listen to, or study, as well as a way to track how many words you know in your language. Pretty cool!
 
-The tool was designed for language learners and supports completely downloadable language packs via plugin architecture. There are **no built-in language processors** - all language processing capabilities are provided through separate downloadable plugins using the `blitzer languages install <lang-code>` command. This means the core tool is lightweight and users only install the languages they actually need. Contributions for new languages are warmly accepted, and should be fairly straightforward to implement.
+The tool was designed for language learners and supports completely downloadable language pack plugins. There are **no built-in lemmatization processors** - all language processing capabilities are acquired using `blitzer languages install <lang-code>` command. Currently **2** languages are supported. Contributions for new languages are warmly accepted, and should be fairly straightforward to implement.
 
-## Installation
+## Installation 
 
 ### Using pip (recommended)
 ```sh

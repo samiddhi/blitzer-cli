@@ -5,9 +5,27 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "blitzer-cli"
 version = "0.1.0"
-description = "A minimalist CLI tool for language text processing"
-authors = [{name = "Blitzer Team"}]
-license = {text = "MIT"}
+description = "A CLI for language-learning vocabulary extraction"
+authors = [{name = "Samiddhi"}]
+license = {text = "GPL-3.0-or-later"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Education",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+    "Topic :: Text Processing :: Linguistic",
+    "Topic :: Utilities"
+]
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -15,7 +33,6 @@ dependencies = [
     "importlib-metadata; python_version < '3.8'",  # For plugin discovery in older Python
     "requests",  # For downloading language data files
     "tomli; python_version < '3.11'",  # TOML support for older Python versions
-    "regex",  # Better regex support with Unicode properties
 ]
 
 [project.scripts]
@@ -49,3 +66,4 @@ omit = [
     "*/env/*",
     "*/__pycache__/*"
 ]
+

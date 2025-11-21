@@ -69,8 +69,12 @@ def tokenizer_func(text: str) -> list[str]:
     """
     # [Language Name] specific tokenization
     # Handle special characters, diacritics, etc.
-    import regex
-    tokens = regex.findall(r"\p{L}+(?:[\p{M}\p{N}'\-]+\p{L}+)*", text.lower())
+    # For advanced Unicode support, you can use the 'regex' library:
+    # import regex
+    # tokens = regex.findall(r"\p{L}+(?:[\p{M}\p{N}'\-]+\p{L}+)*", text.lower())
+    # Or use the standard 're' library for simpler installation:
+    import re
+    tokens = re.findall(r"[a-zA-Z]+(?:[a-zA-Z0-9'\-]*[a-zA-Z]+)?", text.lower())
     return tokens
 
 

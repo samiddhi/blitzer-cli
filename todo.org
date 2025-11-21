@@ -1,7 +1,9 @@
 * TO-DO
 ** High Priority
+- license stuff
 
 ** Low Priority
-- [ ] vibe code assessment
+- -q tags for ignoring config / running from other one
+- rebuild
     
 ** Questions
