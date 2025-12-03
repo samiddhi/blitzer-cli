@@ -72,34 +72,53 @@ def process_text(
     
     # 2. Tokenization  
     if language_spec.get("tokenizer"):
-        tokens = language_spec["tokenizer"](normalized_text)
+        original_tokens = language_spec["tokenizer"](normalized_text)
     else:
-        tokens = regex_tokenize(normalized_text)
+        original_tokens = regex_tokenize(normalized_text)
     
     # 3. Lemmatization (only if --lemmatize/-L and valid database provided)
     processed_tokens = []
+    original_to_processed_map = {}
+    
     if lemmatize_flag and language_code == 'base':
         # If using base language with lemmatize flag, issue warning and continue with original tokens
         print_warning("Base mode has no lemmatization. Proceeding without lemmatization.")
-        processed_tokens = tokens
+        processed_tokens = original_tokens
+        # Map each original token to itself
+        for token in original_tokens:
+            original_to_processed_map[token] = token
     elif lemmatize_flag and language_spec.get("custom_lemmatizer"):
         # Use custom lemmatizer if provided
-        processed_tokens = language_spec["custom_lemmatizer"](tokens)
+        # This is more complex - need to get the mapping from the custom lemmatizer
+        processed_tokens = language_spec["custom_lemmatizer"](original_tokens)
+        # For now, assume the custom lemmatizer maintains order and maps 1:1
+        # A more robust solution would return the mapping from the lemmatizer
+        for orig, proc in zip(original_tokens, processed_tokens):
+            if orig not in original_to_processed_map:
+                original_to_processed_map[orig] = proc
     elif lemmatize_flag and language_spec.get("db_path"):
-        # Use generic SQL lemmatizer
-        processed_tokens = sql_lemmatize_tokens(tokens, language_spec["db_path"])
+        # Use generic SQL lemmatizer with mapping support
+        processed_tokens, original_to_processed_map = sql_lemmatize_tokens_with_mapping(original_tokens, language_spec["db_path"])
     elif lemmatize_flag:
         # If lemmatize flag is set but no lemmatizer available, issue warning and continue with original tokens
         print(f"\033[31mWARNING: No lemmatizer available for language {language_code}. Proceeding without lemmatization.\033[0m", file=sys.stderr)
-        processed_tokens = tokens
+        processed_tokens = original_tokens
+        # Map each original token to itself
+        for token in original_tokens:
+            original_to_processed_map[token] = token
     else:
         # No lemmatization, keep original tokens
-        processed_tokens = tokens
+        processed_tokens = original_tokens
+        # Map each original token to itself
+        for token in original_tokens:
+            original_to_processed_map[token] = token
     
     # 4. Post-processing with exclusion list and formatting
     excluded_terms = get_exclusion_terms(language_code)
     return _format_output(
         processed_tokens, 
+        original_tokens,  # Pass original tokens for context extraction
+        original_to_processed_map,  # Pass the mapping for context extraction
         normalized_text, 
         excluded_terms,
         freq_flag, 
@@ -149,12 +168,12 @@ def get_db_connection(db_path: str):
             pass
 
 
-def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
-    """Lemmatize tokens using SQLite database lookup with in-memory caching."""
+def sql_lemmatize_tokens_with_mapping(tokens: List[str], db_path: str) -> tuple[List[str], Dict[str, str]]:
+    """Lemmatize tokens using SQLite database lookup with in-memory caching and return mapping."""
     global _db_cache
     
     if not tokens:
-        return []
+        return [], {}
     
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
@@ -188,18 +207,31 @@ def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
         # Drop the temporary table
         cursor.execute("DROP TABLE temp_lookup")
         
-        # Build the result list in the original order
+        # Build the result list in the original order and create mapping
         processed_tokens = []
+        original_to_processed_map = {}
         for token in tokens:
             lower_token = token_to_lower[token]
             if lower_token in form_to_lemmas:
-                # Token was found in DB, add all its lemmas
-                processed_tokens.extend(form_to_lemmas[lower_token])
+                # Token was found in DB, typically add the first lemma (most common/principal)
+                lemmas = form_to_lemmas[lower_token]
+                chosen_lemma = lemmas[0]  # Take first/default lemma
+                processed_tokens.append(chosen_lemma)
+                # Map the original token to the chosen lemma
+                original_to_processed_map[token] = chosen_lemma
             else:
                 # Token was not found in DB, add the original token
                 processed_tokens.append(token)
+                # Map the original token to itself  
+                original_to_processed_map[token] = token
         
-        return processed_tokens
+        return processed_tokens, original_to_processed_map
+
+
+def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
+    """Lemmatize tokens using SQLite database lookup with in-memory caching."""
+    processed_tokens, _ = sql_lemmatize_tokens_with_mapping(tokens, db_path)
+    return processed_tokens
 
 
 def get_exclusion_terms(language_code: str) -> set:
@@ -242,6 +274,8 @@ def get_entry_points():
 
 def _format_output(
     tokens: List[str], 
+    original_tokens: List[str], 
+    original_to_processed_map: Dict[str, str],
     normalized_text: str, 
     excluded_terms: set,
     freq_flag: bool, 
@@ -262,42 +296,68 @@ def _format_output(
         if prompt_text:
             result_lines.extend(["PROMPT:", "", prompt_text, "", "------", "******", "------", ""])
     
-    # Calculate frequencies if needed
-    if freq_flag:
-        token_counts = Counter(token for token in tokens if token.lower() not in excluded_terms)
-        for token, count in sorted(token_counts.items(), key=lambda x: x[1], reverse=True):
-            result_lines.append(f"{token}; {count}")
-    else:
-        if context_flag:
-            # For context, we need to map tokens back to sentences
-            sentences = split_sentences(normalized_text)
-            token_counts = Counter(token for token in tokens if token.lower() not in excluded_terms)
+    # Get token counts for frequency calculations using processed tokens
+    token_counts = Counter(token for token in tokens if token.lower() not in excluded_terms)
+    
+    # Prepare sentence contexts if context flag is enabled
+    sentence_contexts = {}
+    if context_flag:
+        sentences = split_sentences(normalized_text)
+        
+        for processed_token in token_counts.keys():
+            contexts = []
             
-            for token, count in sorted(token_counts.items(), key=lambda x: x[1], reverse=True):
-                contexts = []
-                for sentence in sentences:
-                    if token in sentence and len(contexts) < 2:  # Limit to 2 contexts
-                        # Highlight the token in the sentence
-                        escaped_token = re.escape(token)
-                        highlighted = re.sub(
-                            escaped_token,
-                            f"<b>{token}</b>",
-                            sentence,
+            # For each sentence, check if it contains any original tokens that map to this processed token
+            for sentence in sentences:
+                sentence_lower = sentence.lower()
+                
+                # Find original tokens that map to the current processed token and appear in this sentence
+                found_original_forms = []
+                for orig_token, proc_token in original_to_processed_map.items():
+                    if proc_token == processed_token:
+                        # Check if this original token appears as a whole word in the sentence
+                        pattern = r'\b' + re.escape(orig_token.lower()) + r'\b'
+                        if re.search(pattern, sentence_lower):
+                            found_original_forms.append(orig_token)
+                
+                # If we found original forms in this sentence, create the highlighted context
+                if found_original_forms:
+                    highlighted_sentence = sentence
+                    # Highlight the first matching original form found in the sentence
+                    # (to avoid overlapping replacements)
+                    for orig_form in found_original_forms:
+                        pattern = r'\b' + re.escape(orig_form) + r'\b'
+                        highlighted_sentence = re.sub(
+                            pattern,
+                            f"<b>{orig_form}</b>",
+                            highlighted_sentence,
                             flags=re.IGNORECASE
                         )
-                        contexts.append(highlighted)
-                
-                if contexts:
-                    context_str = ", ".join([f'"{c}"' for c in contexts])
-                    if freq_flag:
-                        result_lines.append(f"{token}; {count}; [{context_str}]")
-                    else:
-                        result_lines.append(f"{token}; [{context_str}]")
-        else:
-            # Simple token list without frequencies
-            unique_tokens = set(token for token in tokens if token.lower() not in excluded_terms)
-            for token in sorted(unique_tokens):
-                result_lines.append(token)
+                    
+                    # Replace newlines with <br> tags for proper formatting
+                    highlighted_sentence = highlighted_sentence.replace('\n', '<br>').replace('\r', '<br>')
+                    contexts.append(highlighted_sentence)
+                    
+                if len(contexts) >= 2:  # Limit to 2 contexts
+                    break
+    
+            sentence_contexts[processed_token] = contexts
+    
+    # Build output for each token based on active flags
+    for token, count in sorted(token_counts.items(), key=lambda x: x[1], reverse=True):
+        output_parts = [token]
+        
+        # Add frequency if flag is set
+        if freq_flag:
+            output_parts.append(str(count))
+        
+        # Add context if flag is set and contexts were found
+        if context_flag and sentence_contexts.get(token):
+            context_str = ", ".join([f'"{c}"' for c in sentence_contexts[token]])
+            output_parts.append(f"[{context_str}]")
+        
+        # Join parts with semicolons
+        result_lines.append("; ".join(output_parts))
     
     return "\n".join(result_lines) + "\n"
 

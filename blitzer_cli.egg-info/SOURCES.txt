@@ -2,6 +2,8 @@ LICENSE
 MANIFEST.in
 README.md
 pyproject.toml
+test_input.txt
+test_slovenian.txt
 blitzer_cli/__init__.py
 blitzer_cli/cli.py
 blitzer_cli/config.py
