@@ -46,7 +46,7 @@ def cli():
 def blitz(text, language_code, lemmatize, freq, context, prompt, src):
     # Load config to use defaults for flags
     config = load_config()
-    
+   
     # Use config defaults if CLI flags weren't explicitly set
     lemmatize = lemmatize if lemmatize is not None else config.get('default_lemmatize', False)
     freq = freq if freq is not None else config.get('default_freq', False)
@@ -109,8 +109,9 @@ def manage_languages(action, language_code):
         click.echo(f"Installing language pack: {package_name}")
         
         try:
-            result = subprocess.run([sys.executable, "-m", "pip", "install", package_name], 
-                                  capture_output=True, text=True, check=True)
+            result = subprocess.run([sys.executable, "-m", "pip",
+                                     "install", package_name],
+                                    capture_output=True, text=True, check=True)
             click.echo(f"Successfully installed {package_name}")
             click.echo(result.stdout)
         except subprocess.CalledProcessError as e:
@@ -121,18 +122,19 @@ def manage_languages(action, language_code):
         if not language_code:
             print_error("Please specify a language code to uninstall.")
             raise click.Abort()
-        
+
         # Validate the language code to prevent injection
         if not validate_language_code(language_code):
             print_error(f"Invalid language code format: {language_code}. Use 3 lowercase letters (ISO 639-3).")
             raise click.Abort()
-        
+
         package_name = f"blitzer-language-{language_code}"
         click.echo(f"Uninstalling language pack: {package_name}")
-        
+
         try:
-            result = subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", package_name], 
-                                  capture_output=True, text=True, check=True)
+            result = subprocess.run([sys.executable, "-m", "pip",
+                                     "uninstall", "-y", package_name],
+                                    capture_output=True, text=True, check=True)
             click.echo(f"Successfully uninstalled {package_name}")
             click.echo(result.stdout)
         except subprocess.CalledProcessError as e:

@@ -1,9 +1,12 @@
 * TO-DO
 ** High Priority
-- license stuff
 
 ** Low Priority
 - -q tags for ignoring config / running from other one
-- rebuild
+- edit config with commands
+- different config options per language
+- exclusion list tools (remove-dups, open, print, export, etc.)
+- automatic language plugin generation
+  - blitzer-language-devtools plugin
     
 ** Questions
