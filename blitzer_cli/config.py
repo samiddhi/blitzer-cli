@@ -38,31 +38,46 @@ def get_config_dir():
     return config_dir
 
 
-def load_config():
-    """Load configuration from XDG config file."""
-    config_dir = get_config_dir()
-    config_file = config_dir / 'config.toml'
+def load_config(config_path=None, use_default_config=True):
+    """Load configuration from XDG config file or specific path.
     
-    # Create config directory if it doesn't exist
-    config_dir.mkdir(parents=True, exist_ok=True)
+    Args:
+        config_path: Optional path to a specific config file, otherwise use default location
+        use_default_config: If True, create and return default config when loading fails
+    """
+    if config_path:
+        # Use the provided config path
+        config_file = Path(config_path)
+    else:
+        # Use default XDG config location
+        config_dir = get_config_dir()
+        config_file = config_dir / 'config.toml'
+        
+        # Create config directory if it doesn't exist (only for default location)
+        if use_default_config:
+            config_dir.mkdir(parents=True, exist_ok=True)
     
     # Load the config
     try:
         with open(config_file, 'rb') as f:
             return tomllib.load(f)
     except Exception:
-        # If config doesn't exist or fails to load, create default and reload
-        if not config_file.exists():
-            create_default_config(config_file)
-            # Now load the newly created config
-            try:
-                with open(config_file, 'rb') as f:
-                    return tomllib.load(f)
-            except Exception:
-                # If it still fails after creating default, return empty config
+        if use_default_config and config_path is None:
+            # If config doesn't exist or fails to load, create default and reload
+            if not config_file.exists():
+                create_default_config(config_file)
+                # Now load the newly created config
+                try:
+                    with open(config_file, 'rb') as f:
+                        return tomllib.load(f)
+                except Exception:
+                    # If it still fails after creating default, return empty config
+                    return {}
+            else:
+                # If file exists but loading failed for other reasons, return empty config
                 return {}
         else:
-            # If file exists but loading failed for other reasons, return empty config
+            # If use_default_config is False, return empty config without creating default
             return {}
 
 
@@ -77,6 +92,12 @@ default_freq = false       # Default value for --freq/-f flag
 default_context = false    # Default value for --context/-c flag
 default_prompt = false     # Default value for --prompt/-p flag
 default_src = false        # Default value for --src/-s flag
+
+# Language-specific exclusion list paths
+# Each key in the exclusions table represents a language code with its exclusion file path
+# Example: "slv" = "/path/to/slovenian_exclusion.txt"
+# Example: "pli" = "/path/to/pali_exclusion.txt"
+[exclusions]
 
 # Language-specific prompts
 # Each key in the prompts table represents a language code with its custom prompt

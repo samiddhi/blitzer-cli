@@ -43,16 +43,39 @@ def cli():
 @click.option("--context/--no-context", "-c", default=None, help="Includes sample context for each word in output.")
 @click.option("--prompt/--no-prompt", "-p", default=None, help="Includes custom prompt for LLM at the top of output.",)
 @click.option("--src/--no-src", "-s", default=None, help="Includes the full source text at the top of output.")
-def blitz(text, language_code, lemmatize, freq, context, prompt, src):
-    # Load config to use defaults for flags
-    config = load_config()
+@click.option("--no-config", "-n", is_flag=True, default=False, help="Don't load any config file, use built-in defaults only.")
+@click.option("--config", "-C", type=click.Path(exists=True), help="Use specific config file instead of default.")
+@click.option("--exclusion", "-e", multiple=True, help="Specify exclusion list for a language (format: language_code:/path/to/exclusion.txt). Can be used multiple times.")
+def blitz(text, language_code, lemmatize, freq, context, prompt, src, no_config, config, exclusion):
+    # Load config based on flags
+    if no_config:
+        # Don't load any config, use empty dict to indicate no config mode
+        config_dict = {}
+    elif config:
+        # Load from specified config file
+        config_dict = load_config(config_path=config, use_default_config=False)
+    else:
+        # Load from default config location
+        config_dict = load_config()
    
     # Use config defaults if CLI flags weren't explicitly set
-    lemmatize = lemmatize if lemmatize is not None else config.get('default_lemmatize', False)
-    freq = freq if freq is not None else config.get('default_freq', False)
-    context = context if context is not None else config.get('default_context', False)
-    prompt = prompt if prompt is not None else config.get('default_prompt', False)
-    src = src if src is not None else config.get('default_src', False)
+    lemmatize = lemmatize if lemmatize is not None else config_dict.get('default_lemmatize', False)
+    freq = freq if freq is not None else config_dict.get('default_freq', False)
+    context = context if context is not None else config_dict.get('default_context', False)
+    prompt = prompt if prompt is not None else config_dict.get('default_prompt', False)
+    src = src if src is not None else config_dict.get('default_src', False)
+
+    # Process exclusion overrides
+    from .processor import set_exclusion_override
+    for excl in exclusion:
+        if ':' in excl:
+            parts = excl.split(':', 1)  # Split only on first ':'
+            lang_code = parts[0].strip()
+            excl_path = parts[1].strip()
+            set_exclusion_override(lang_code, excl_path)
+        else:
+            print_error(f"Invalid exclusion format: {excl}. Use language_code:/path/to/file.txt")
+            raise click.Abort()
 
     input_text = text.strip() if text else sys.stdin.read().strip()
 
@@ -65,6 +88,7 @@ def blitz(text, language_code, lemmatize, freq, context, prompt, src):
         output = process_text(
             input_text,
             language_code,
+            config=config_dict,
             lemmatize_flag=lemmatize,
             freq_flag=freq,
             context_flag=context,

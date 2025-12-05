@@ -20,6 +20,7 @@ import re
 import sqlite3
 from collections import Counter
 from contextlib import contextmanager
+from pathlib import Path
 from typing import List, Dict, Optional, Any
 
 from blitzer_cli.utils import print_warning
@@ -47,6 +48,7 @@ def regex_tokenize(text: str) -> List[str]:
 def process_text(
     text: str,
     language_code: str,
+    config: dict = None,
     lemmatize_flag: bool = False,
     freq_flag: bool = False,
     context_flag: bool = False,
@@ -54,6 +56,9 @@ def process_text(
     src_flag: bool = False,
 ) -> str:
     """Process text according to specified flags following the new architecture."""
+    # Set the current config for this processing session
+    set_current_config(config)
+    
     # Load language specification via entry points
     language_spec = get_language_spec(language_code)
     
@@ -78,47 +83,43 @@ def process_text(
     
     # 3. Lemmatization (only if --lemmatize/-L and valid database provided)
     processed_tokens = []
-    original_to_processed_map = {}
+    original_to_all_lemmas_map = {}  # This will map original tokens to lists of their possible lemmas
     
     if lemmatize_flag and language_code == 'base':
         # If using base language with lemmatize flag, issue warning and continue with original tokens
         print_warning("Base mode has no lemmatization. Proceeding without lemmatization.")
         processed_tokens = original_tokens
-        # Map each original token to itself
-        for token in original_tokens:
-            original_to_processed_map[token] = token
+        # Map each original token to itself as a single-element list
+        original_to_all_lemmas_map = {token: [token] for token in original_tokens}
     elif lemmatize_flag and language_spec.get("custom_lemmatizer"):
-        # Use custom lemmatizer if provided
-        # This is more complex - need to get the mapping from the custom lemmatizer
+        # Use custom lemmatizer if provided - for now we'll use 1:1 mapping
         processed_tokens = language_spec["custom_lemmatizer"](original_tokens)
-        # For now, assume the custom lemmatizer maintains order and maps 1:1
-        # A more robust solution would return the mapping from the lemmatizer
+        # Map each original token to its single lemmatized result as a single-element list
+        original_to_all_lemmas_map = {}
         for orig, proc in zip(original_tokens, processed_tokens):
-            if orig not in original_to_processed_map:
-                original_to_processed_map[orig] = proc
+            original_to_all_lemmas_map[orig] = [proc]
     elif lemmatize_flag and language_spec.get("db_path"):
-        # Use generic SQL lemmatizer with mapping support
-        processed_tokens, original_to_processed_map = sql_lemmatize_tokens_with_mapping(original_tokens, language_spec["db_path"])
+        # Use generic SQL lemmatizer with mapping support - get ALL possible lemmas
+        all_lemmas, original_to_all_lemmas_map = sql_lemmatize_tokens_with_mapping(original_tokens, language_spec["db_path"])
+        processed_tokens = all_lemmas  # Use all lemmas, not just unique ones, to preserve multiple mappings
     elif lemmatize_flag:
         # If lemmatize flag is set but no lemmatizer available, issue warning and continue with original tokens
         print(f"\033[31mWARNING: No lemmatizer available for language {language_code}. Proceeding without lemmatization.\033[0m", file=sys.stderr)
         processed_tokens = original_tokens
-        # Map each original token to itself
-        for token in original_tokens:
-            original_to_processed_map[token] = token
+        # Map each original token to itself as a single-element list
+        original_to_all_lemmas_map = {token: [token] for token in original_tokens}
     else:
         # No lemmatization, keep original tokens
         processed_tokens = original_tokens
-        # Map each original token to itself
-        for token in original_tokens:
-            original_to_processed_map[token] = token
+        # Map each original token to itself as a single-element list
+        original_to_all_lemmas_map = {token: [token] for token in original_tokens}
     
     # 4. Post-processing with exclusion list and formatting
     excluded_terms = get_exclusion_terms(language_code)
     return _format_output(
         processed_tokens, 
         original_tokens,  # Pass original tokens for context extraction
-        original_to_processed_map,  # Pass the mapping for context extraction
+        original_to_all_lemmas_map,  # Pass the mapping (now List[str] values) for context extraction
         normalized_text, 
         excluded_terms,
         freq_flag, 
@@ -168,8 +169,8 @@ def get_db_connection(db_path: str):
             pass
 
 
-def sql_lemmatize_tokens_with_mapping(tokens: List[str], db_path: str) -> tuple[List[str], Dict[str, str]]:
-    """Lemmatize tokens using SQLite database lookup with in-memory caching and return mapping."""
+def sql_lemmatize_tokens_with_mapping(tokens: List[str], db_path: str) -> tuple[List[str], Dict[str, List[str]]]:
+    """Lemmatize tokens using SQLite database lookup with in-memory caching and return mapping from original tokens to all possible lemmas."""
     global _db_cache
     
     if not tokens:
@@ -207,25 +208,24 @@ def sql_lemmatize_tokens_with_mapping(tokens: List[str], db_path: str) -> tuple[
         # Drop the temporary table
         cursor.execute("DROP TABLE temp_lookup")
         
-        # Build the result list in the original order and create mapping
-        processed_tokens = []
-        original_to_processed_map = {}
+        # Build the result list with ALL possible lemmas
+        all_lemmas = []
+        original_to_all_lemmas_map = {}
         for token in tokens:
             lower_token = token_to_lower[token]
             if lower_token in form_to_lemmas:
-                # Token was found in DB, typically add the first lemma (most common/principal)
                 lemmas = form_to_lemmas[lower_token]
-                chosen_lemma = lemmas[0]  # Take first/default lemma
-                processed_tokens.append(chosen_lemma)
-                # Map the original token to the chosen lemma
-                original_to_processed_map[token] = chosen_lemma
+                # Add all lemmas to our list of all possible lemmas
+                all_lemmas.extend(lemmas)
+                # Map original token to list of ALL its lemmas
+                original_to_all_lemmas_map[token] = lemmas
             else:
                 # Token was not found in DB, add the original token
-                processed_tokens.append(token)
-                # Map the original token to itself  
-                original_to_processed_map[token] = token
+                all_lemmas.append(token)
+                # Map the original token to itself as a list
+                original_to_all_lemmas_map[token] = [token]
         
-        return processed_tokens, original_to_processed_map
+        return all_lemmas, original_to_all_lemmas_map
 
 
 def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
@@ -235,14 +235,67 @@ def sql_lemmatize_tokens(tokens: List[str], db_path: str) -> List[str]:
 
 
 def get_exclusion_terms(language_code: str) -> set:
+    """Get exclusion terms for the language using config to determine path."""
+    from .config import load_config
+# Global variables to hold current execution context (set by CLI)
+_exclusion_overrides = {}
+_current_config = {}
+
+
+def set_exclusion_override(language_code: str, exclusion_path: str) -> None:
+    """Set an exclusion override for a specific language."""
+    global _exclusion_overrides
+    _exclusion_overrides[language_code] = exclusion_path
+
+
+def set_current_config(config: dict) -> None:
+    """Set the current config for this processing session."""
+    global _current_config
+    _current_config = config
+
+
+def get_exclusion_terms(language_code: str) -> set:
     """Get exclusion terms for the language."""
-    from .config import get_config_dir
-    config_dir = get_config_dir()
-    exclusion_path = config_dir / f"{language_code}_exclusion.txt"
+    
+    # Check if there's an exclusion override for this language (from -e flag)
+    if language_code in _exclusion_overrides:
+        exclusion_path_str = _exclusion_overrides[language_code]
+        exclusion_path = Path(exclusion_path_str).expanduser()
+        exclusion_terms = set()
+        if exclusion_path.exists():
+            with open(exclusion_path, "r", encoding="utf-8") as f:
+                exclusion_terms = {line.strip().lower() for line in f if line.strip()}
+        else:
+            print_warning(f"Exclusion file does not exist: {exclusion_path_str}")
+        return exclusion_terms
+    
+    # No override, check current config (only from CLI, not default loading)
+    global _current_config
+    # If _current_config is empty/None, no exclusions should be loaded
+    if not _current_config:
+        # No config was loaded (e.g., --no-config was used)
+        # In this case, don't show warning since this is expected behavior
+        return set()
+    
+    # Get exclusion file path from the config that was loaded via CLI
+    exclusions_config = _current_config.get('exclusions', {})
+    exclusion_path_str = exclusions_config.get(language_code)
+    
     exclusion_terms = set()
-    if exclusion_path.exists():
-        with open(exclusion_path, "r", encoding="utf-8") as f:
-            exclusion_terms = {line.strip().lower() for line in f if line.strip()}
+    
+    if exclusion_path_str:
+        # Use the path from config, expanding user home directory if needed
+        exclusion_path = Path(exclusion_path_str).expanduser()
+        if exclusion_path.exists():
+            with open(exclusion_path, "r", encoding="utf-8") as f:
+                exclusion_terms = {line.strip().lower() for line in f if line.strip()}
+        else:
+            print_warning(f"Exclusion file does not exist: {exclusion_path_str}")
+    else:
+        # If no exclusion path is specified in config, don't issue a warning
+        # since this is expected behavior for many languages
+        pass
+    
     return exclusion_terms
 
 
@@ -275,7 +328,7 @@ def get_entry_points():
 def _format_output(
     tokens: List[str], 
     original_tokens: List[str], 
-    original_to_processed_map: Dict[str, str],
+    original_to_processed_map: Dict[str, List[str]],  # Changed to List[str] values
     normalized_text: str, 
     excluded_terms: set,
     freq_flag: bool, 
@@ -313,8 +366,8 @@ def _format_output(
                 
                 # Find original tokens that map to the current processed token and appear in this sentence
                 found_original_forms = []
-                for orig_token, proc_token in original_to_processed_map.items():
-                    if proc_token == processed_token:
+                for orig_token, possible_lemmas in original_to_processed_map.items():
+                    if processed_token in possible_lemmas:  # Check if this processed token is in the list of possible lemmas
                         # Check if this original token appears as a whole word in the sentence
                         pattern = r'\b' + re.escape(orig_token.lower()) + r'\b'
                         if re.search(pattern, sentence_lower):
